@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.is_takip"
+    namespace = "com.aasoft.is_takip"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
