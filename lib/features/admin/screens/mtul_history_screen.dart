@@ -38,25 +38,34 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
   Widget build(BuildContext context) {
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_selectedCustomer == null ? 'Müşteri Özeti' : '$_selectedCustomer - Geçmiş'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (_selectedCustomer != null) {
-              setState(() => _selectedCustomer = null);
-            } else if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppConstants.adminDashboardRoute);
-            }
-          },
+    return PopScope(
+      canPop: _selectedCustomer == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_selectedCustomer != null) {
+          setState(() => _selectedCustomer = null);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_selectedCustomer == null ? 'Müşteri Özeti' : '$_selectedCustomer - Geçmiş'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (_selectedCustomer != null) {
+                setState(() => _selectedCustomer = null);
+              } else if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(AppConstants.adminDashboardRoute);
+              }
+            },
+          ),
         ),
+        body: _selectedCustomer == null 
+            ? _buildCustomerSummary(isDesktop) 
+            : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
       ),
-      body: _selectedCustomer == null 
-          ? _buildCustomerSummary(isDesktop) 
-          : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
     );
   }
 

@@ -9,6 +9,8 @@ import 'mtul_prices_screen.dart';
 import '../../../core/widgets/customer_autocomplete.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/utils/keyboard_shortcuts.dart';
+import '../../../core/utils/refresh_utils.dart';
+import 'mtul_history_screen.dart';
 
 class MtulCalculationScreen extends ConsumerStatefulWidget {
   const MtulCalculationScreen({super.key});
@@ -94,8 +96,8 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
       );
 
       if (mounted) {
-        // Yeni bir müşteri eklenmiş olabileceği için listeyi yenile
-        ref.invalidate(allCustomerNamesProvider);
+        // Tüm metretül verilerini ve detaylarını yenile
+        RefreshUtils.invalidateMtulData(ref, _customerNameController.text.trim());
         
         // Formu temizle
         _customerNameController.clear();
@@ -119,8 +121,14 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
     // Seçili kategoriye göre fiyatları çek (Oto-seed özelliği sayesinde veri yoksa oluşur)
     final pricesAsync = ref.watch(mtulPricesProvider(_selectedCategory));
 
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppConstants.adminDashboardRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
         title: const Text('Metretül Hesaplama'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -407,6 +415,6 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
           ),
         ),
       ),
-    ));
+    )));
   }
 }

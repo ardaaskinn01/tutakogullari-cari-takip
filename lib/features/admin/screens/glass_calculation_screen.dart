@@ -8,6 +8,8 @@ import '../../dashboard/repositories/glass_repository.dart';
 import '../../../core/widgets/customer_autocomplete.dart';
 import '../../../core/services/customer_service.dart';
 import '../../../core/utils/keyboard_shortcuts.dart';
+import '../../../core/utils/refresh_utils.dart';
+import 'glass_history_screen.dart';
 
 class GlassCalculationScreen extends ConsumerStatefulWidget {
   const GlassCalculationScreen({super.key});
@@ -70,8 +72,8 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
       await repository.saveCalculation(calc);
 
       if (mounted) {
-        // Yeni bir müşteri eklenmiş olabileceği için listeyi yenile
-        ref.invalidate(allCustomerNamesProvider);
+        // Tüm cam verilerini ve detaylarını yenile
+        RefreshUtils.invalidateGlassData(ref, _nameController.text.trim());
         
         // Formu temizle (Müşteri adı ve birim fiyat kalabilir kolaylık olsun diye)
         _widthController.clear();
@@ -103,8 +105,14 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppConstants.adminDashboardRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
         title: const Text('Cam m² Hesaplama'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -260,7 +268,7 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
           ),
         ),
       ),
-    ));
+    )));
   }
 }
 

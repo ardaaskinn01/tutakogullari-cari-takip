@@ -29,15 +29,35 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = authService.currentUser;
       final isLoginRoute = state.matchedLocation == AppConstants.loginRoute;
 
+      // Kullanıcı yoksa login'e yönlendir
       if (user == null && !isLoginRoute) {
         return AppConstants.loginRoute;
       }
 
+      // Kullanıcı varsa ve login sayfasındaysa dashboard'a yönlendir
       if (user != null && isLoginRoute) {
         final isAdmin = await authService.isAdmin();
         return isAdmin 
             ? AppConstants.adminDashboardRoute 
             : AppConstants.userDashboardRoute;
+      }
+
+      // Admin olmayan kullanıcıların admin sayfalarına erişimini engelle
+      if (user != null) {
+        final isAdmin = await authService.isAdmin();
+        final adminOnlyRoutes = [
+          AppConstants.adminDashboardRoute,
+          AppConstants.kasaDefteriRoute,
+          AppConstants.cariHomeRoute,
+          AppConstants.staffListRoute,
+          AppConstants.transactionHistoryRoute,
+          AppConstants.mtulPricesRoute,
+        ];
+
+        // Admin olmayan biri admin sayfasına gitmeye çalışıyorsa user dashboard'a yönlendir
+        if (!isAdmin && adminOnlyRoutes.any((route) => state.matchedLocation.startsWith(route))) {
+          return AppConstants.userDashboardRoute;
+        }
       }
 
       return null;

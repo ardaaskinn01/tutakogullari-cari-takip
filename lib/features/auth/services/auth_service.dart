@@ -155,12 +155,18 @@ final currentUserProvider = StreamProvider<User?>((ref) {
 
 // Current user profile provider
 final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
+  final user = ref.watch(currentUserProvider).value;
+  if (user == null) return null;
+  
   final authService = ref.watch(authServiceProvider);
   return await authService.getCurrentUserProfile();
 });
 
 // Is admin provider
 final isAdminProvider = FutureProvider<bool>((ref) async {
+  final user = ref.watch(currentUserProvider).value;
+  if (user == null) return false;
+  
   final authService = ref.watch(authServiceProvider);
   return await authService.isAdmin();
 });

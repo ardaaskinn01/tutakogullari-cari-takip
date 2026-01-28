@@ -11,6 +11,7 @@ import '../../dashboard/repositories/transaction_repository.dart';
 import '../../dashboard/screens/user_dashboard_screen.dart';
 import '../../dashboard/widgets/add_transaction_modal.dart';
 import 'admin_dashboard_screen.dart';
+import '../../../core/utils/refresh_utils.dart';
 import 'kasa_defteri_screen.dart';
 
 // Diğer ekranlarda kullandığın ve aşağıda invalidate ettiğin provider'ları buraya import etmelisin:
@@ -69,6 +70,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
               DataColumn(label: Text('Tür')),
               DataColumn(label: Text('Açıklama')),
               DataColumn(label: Text('Yöntem')),
+              DataColumn(label: Text('Ekleyen')),
               DataColumn(label: Text('Tutar'), numeric: true),
               DataColumn(label: Text('İşlemler')),
             ],
@@ -82,6 +84,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
                 )),
                 DataCell(Text(tx.description)),
                 DataCell(Text(tx.paymentMethod.displayName)),
+                DataCell(Text(tx.createdByName ?? '-')),
                 DataCell(Text(
                   Helpers.formatCurrency(tx.amount),
                   style: TextStyle(
@@ -126,7 +129,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
             ),
             title: Text(tx.description),
             subtitle: Text(
-              '${DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt)} • ${tx.paymentMethod.displayName}',
+              '${DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt)} • ${tx.paymentMethod.displayName}${tx.createdByName != null ? ' • ${tx.createdByName}' : ''}',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: Row(
@@ -237,10 +240,6 @@ class TransactionHistoryScreen extends ConsumerWidget {
   }
 
   void _invalidateAll(WidgetRef ref) {
-    ref.invalidate(recentTransactionsProvider);
-    ref.invalidate(balanceProvider);
-    ref.invalidate(allTransactionsProvider);
-    ref.invalidate(reportDataProvider);
-    ref.invalidate(userTransactionsProvider);
+    RefreshUtils.invalidateAllFinancialData(ref);
   }
 }

@@ -49,8 +49,14 @@ class KasaDefteriScreen extends ConsumerWidget {
     final reportDataAsync = ref.watch(reportDataProvider);
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppConstants.adminDashboardRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
         title: const Text('Kasa Raporları'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -164,35 +170,40 @@ class KasaDefteriScreen extends ConsumerWidget {
                           const SizedBox(height: 48),
 
                           // Tüm İşlemler Tablosu
-                          DataTableWrapper(
-                            title: 'İşlem Detayları',
-                            columns: const [
-                              DataColumn(label: Text('Tarih')),
-                              DataColumn(label: Text('Tür')),
-                              DataColumn(label: Text('Açıklama')),
-                              DataColumn(label: Text('Yöntem')),
-                              DataColumn(label: Text('Tutar'), numeric: true),
-                            ],
-                            rows: transactions.map((tx) => DataRow(
-                              cells: [
-                                DataCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt))),
-                                DataCell(Icon(
-                                  tx.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                                  color: tx.isIncome ? Colors.green : Colors.red,
-                                  size: 16,
-                                )),
-                                DataCell(Text(tx.description)),
-                                DataCell(Text(tx.paymentMethod.displayName)),
-                                DataCell(Text(
-                                  Helpers.formatCurrency(tx.amount),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: tx.isIncome ? Colors.green : Colors.red,
-                                  ),
-                                )),
+                          if (isDesktop)
+                            DataTableWrapper(
+                              title: 'İşlem Detayları',
+                              columns: const [
+                                DataColumn(label: Text('Tarih')),
+                                DataColumn(label: Text('Tür')),
+                                DataColumn(label: Text('Açıklama')),
+                                DataColumn(label: Text('Yöntem')),
+                                DataColumn(label: Text('Ekleyen')),
+                                DataColumn(label: Text('Tutar'), numeric: true),
                               ],
-                            )).toList(),
-                          ),
+                              rows: transactions.map((tx) => DataRow(
+                                cells: [
+                                  DataCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt))),
+                                  DataCell(Icon(
+                                    tx.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                                    color: tx.isIncome ? Colors.green : Colors.red,
+                                    size: 16,
+                                  )),
+                                  DataCell(Text(tx.description)),
+                                  DataCell(Text(tx.paymentMethod.displayName)),
+                                  DataCell(Text(tx.createdByName ?? '-')),
+                                  DataCell(Text(
+                                    Helpers.formatCurrency(tx.amount),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: tx.isIncome ? Colors.green : Colors.red,
+                                    ),
+                                  )),
+                                ],
+                              )).toList(),
+                            )
+                          else
+                            _buildMobileTransactionList(context, transactions),
                           const SizedBox(height: 40),
                         ],
                       ),
@@ -204,6 +215,71 @@ class KasaDefteriScreen extends ConsumerWidget {
           ),
         ],
       ),
+    ));
+  }
+
+  Widget _buildMobileTransactionList(BuildContext context, List<Transaction> transactions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16.0),
+          child: Text(
+            'İşlem Detayları',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: transactions.length,
+          itemBuilder: (context, index) {
+            final tx = transactions[index];
+            final color = tx.isIncome ? Colors.green : Colors.red;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Colors.white10),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: CircleAvatar(
+                  backgroundColor: color.withOpacity(0.1),
+                  child: Icon(
+                    tx.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                    color: color,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  tx.description,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      '${DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt)} • ${tx.paymentMethod.displayName}${tx.createdByName != null ? ' • ${tx.createdByName}' : ''}',
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    ),
+                  ],
+                ),
+                trailing: Text(
+                  Helpers.formatCurrency(tx.amount),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

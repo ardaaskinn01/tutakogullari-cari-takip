@@ -6,6 +6,7 @@ import '../../../models/transaction.dart';
 import '../../auth/services/auth_service.dart';
 import '../repositories/transaction_repository.dart';
 import '../widgets/add_transaction_modal.dart';
+import '../../../core/utils/refresh_utils.dart';
 import '../../../core/widgets/side_menu.dart';
 
 // Sadece oturum açan kullanıcının işlemlerini getirir
@@ -28,16 +29,41 @@ class UserDashboardScreen extends ConsumerWidget {
     final transactionsAsync = ref.watch(userTransactionsProvider);
     final userProfileAsync = ref.watch(currentUserProfileProvider);
 
-    return Scaffold(
-      drawer: MediaQuery.of(context).size.width <= 900 
-        ? const Drawer(child: SideMenu(isDrawer: true)) 
-        : null,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Uygulamadan Çık'),
+            content: const Text('Uygulamayı kapatmak istediğinize emin misiniz?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('HAYIR')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('EVET')),
+            ],
+          ),
+        );
+
+        if (shouldExit == true) {
+          if (context.mounted) Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        drawer: MediaQuery.of(context).size.width <= 900 
+          ? Drawer(child: SideMenu(
+              key: ValueKey(ref.watch(currentUserProvider).value?.id ?? 'user-drawer'),
+              isDrawer: true
+            )) 
+          : null,
+        appBar: AppBar(
         title: const Text('Personel Paneli'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              RefreshUtils.clearAllUserData(ref);
               final authService = ref.read(authServiceProvider);
               await authService.signOut();
             },
@@ -53,14 +79,12 @@ class UserDashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-               // Hoşgeldin Mesajı
-              userProfileAsync.when(
-                data: (profile) => Text(
-                  'Merhaba, ${profile?.displayName ?? "Personel"}',
-                  style: Theme.of(context).textTheme.headlineSmall,
+              // Başlık
+              Text(
+                'İşlemlerim',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                loading: () => const SizedBox(height: 32),
-                error: (_, __) => const SizedBox(),
               ),
               const SizedBox(height: 8),
               Text(
@@ -91,8 +115,8 @@ class UserDashboardScreen extends ConsumerWidget {
             backgroundColor: Colors.transparent,
             builder: (context) => AddTransactionModal(
               onSuccess: () {
-                // İşlem eklenince listeyi yenile
-                ref.invalidate(userTransactionsProvider);
+                // İşlem eklenince tüm finansal verileri yenile
+                RefreshUtils.invalidateAllFinancialData(ref);
               },
             ),
           );
@@ -100,7 +124,7 @@ class UserDashboardScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('İşlem Ekle'),
       ),
-    );
+    ));
   }
 
   Widget _buildTransactionList(BuildContext context, List<Transaction> transactions) {

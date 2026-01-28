@@ -8,6 +8,8 @@ import '../../../models/cari_account.dart';
 import '../../../models/cari_transaction.dart';
 import '../../../models/transaction.dart'; // TransactionType (Sadece helper olarak, enum PaymentMethod için)
 import '../../dashboard/repositories/cari_repository.dart';
+import '../../auth/services/auth_service.dart';
+import '../../../core/utils/refresh_utils.dart';
 
 // --- Providers ---
 
@@ -24,15 +26,21 @@ class CariAlacaklarScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final accountsAsync = ref.watch(cariAccountsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cari Alacaklar'),
-        leading: MediaQuery.of(context).size.width <= 900 
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.go(AppConstants.adminDashboardRoute),
-            )
-          : null,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppConstants.adminDashboardRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Cari Alacaklar'),
+          leading: MediaQuery.of(context).size.width <= 900 
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go(AppConstants.adminDashboardRoute),
+              )
+            : null,
         actions: [
           if (MediaQuery.of(context).size.width > 900) ...[
             FilledButton.icon(
@@ -144,7 +152,7 @@ class CariAlacaklarScreen extends ConsumerWidget {
             ],
           )
         : null,
-    );
+    ));
   }
 
   void _showAddAlacakDialog(BuildContext context, WidgetRef ref) {
@@ -202,12 +210,14 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
 
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       if (amount > 0) {
+        final user = ref.read(currentUserProvider).value;
         final tx = CariTransaction(
           id: '',
           accountId: accountId,
           type: CariTransactionType.debt,
           amount: amount,
           description: _descController.text.isEmpty ? 'Açılış Bakiyesi' : _descController.text,
+          createdBy: user?.id ?? '',
           createdAt: DateTime.now(),
         );
         await repository.addTransaction(tx);
@@ -215,7 +225,7 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
 
       if (mounted) {
         Navigator.pop(context);
-        ref.invalidate(cariAccountsProvider);
+        RefreshUtils.invalidateAllFinancialData(ref);
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Alacak kaydı başarıyla oluşturuldu'), backgroundColor: Colors.green),
         );
@@ -335,6 +345,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
       
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       
+      final user = ref.read(currentUserProvider).value;
       final tx = CariTransaction(
         id: '',
         accountId: _selectedAccountId!,
@@ -342,6 +353,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
         amount: amount,
         paymentMethod: _selectedPaymentMethod, // Nakit/Kart/Çek
         description: 'Tahsilat',
+        createdBy: user?.id ?? '',
         createdAt: DateTime.now(),
       );
       
@@ -349,7 +361,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
 
       if (mounted) {
         Navigator.pop(context);
-        ref.invalidate(cariAccountsProvider); // Listeyi yenile
+        RefreshUtils.invalidateAllFinancialData(ref); // Listeyi yenile
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Tahsilat başarıyla kaydedildi'), backgroundColor: Colors.green),
         );

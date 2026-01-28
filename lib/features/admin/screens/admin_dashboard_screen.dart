@@ -8,6 +8,7 @@ import '../../../models/transaction.dart' as model;
 import '../../auth/services/auth_service.dart';
 import '../../dashboard/repositories/transaction_repository.dart';
 import '../../dashboard/widgets/add_transaction_modal.dart';
+import '../../../core/utils/refresh_utils.dart';
 import '../../../core/widgets/side_menu.dart';
 
 // Providers for dashboard state
@@ -34,12 +35,35 @@ class AdminDashboardScreen extends ConsumerWidget {
     final transactionsAsync = ref.watch(allTransactionsProvider);
     final userProfileAsync = ref.watch(currentUserProfileProvider);
 
-    return Scaffold(
-      drawer: MediaQuery.of(context).size.width <= 900 
-        ? const Drawer(child: SideMenu(isDrawer: true)) 
-        : null,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Uygulamadan Çık'),
+            content: const Text('Uygulamayı kapatmak istediğinize emin misiniz?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('HAYIR')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('EVET')),
+            ],
+          ),
+        );
 
-      appBar: AppBar(
+        if (shouldExit == true) {
+          if (context.mounted) Navigator.of(context).pop(); // Bu genellikle kökte uygulamayı kapatır
+        }
+      },
+      child: Scaffold(
+        drawer: MediaQuery.of(context).size.width <= 900 
+          ? Drawer(child: SideMenu(
+              key: ValueKey(ref.watch(currentUserProvider).value?.id ?? 'admin-drawer'),
+              isDrawer: true
+            )) 
+          : null,
+        appBar: AppBar(
         title: const Text('Yönetici Paneli'),
         leading: MediaQuery.of(context).size.width <= 900 
           ? Builder(
@@ -140,7 +164,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             label: const Text('İşlem Ekle'),
           )
         : null,
-    );
+    ));
   }
 
   Widget _buildSummaryCards(BuildContext context, Map<String, double> balance) {
@@ -272,6 +296,14 @@ class AdminDashboardScreen extends ConsumerWidget {
                   '${Helpers.formatDate(transaction.createdAt)} • ${transaction.paymentMethod.displayName}',
                    style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (transaction.createdByName != null)
+                  Text(
+                    'Ekleyen: ${transaction.createdByName}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.blueGrey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
               ],
             ),
             trailing: Text(
@@ -305,8 +337,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
               child: AddTransactionModal(
                 onSuccess: () {
-                  ref.invalidate(allTransactionsProvider);
-                  ref.invalidate(balanceProvider);
+                  RefreshUtils.invalidateAllFinancialData(ref);
                 },
               ),
             ),
@@ -320,8 +351,7 @@ class AdminDashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         builder: (context) => AddTransactionModal(
           onSuccess: () {
-            ref.invalidate(allTransactionsProvider);
-            ref.invalidate(balanceProvider);
+            RefreshUtils.invalidateAllFinancialData(ref);
           },
         ),
       );

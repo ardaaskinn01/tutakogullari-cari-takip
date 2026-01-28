@@ -6,6 +6,7 @@ import '../../../core/utils/helpers.dart';
 import '../../../models/cari_account.dart';
 import '../../../models/cari_transaction.dart';
 import '../../dashboard/repositories/cari_repository.dart';
+import '../../../core/utils/refresh_utils.dart';
 
 // --- Providers ---
 
@@ -252,7 +253,10 @@ class CariAccountDetailScreen extends ConsumerWidget {
                 child: Text(tx.description!),
               ),
             const SizedBox(height: 4),
-            Text(Helpers.formatDateTime(tx.createdAt), style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            Text(
+              '${Helpers.formatDateTime(tx.createdAt)}${tx.createdByName != null ? ' • ${tx.createdByName}' : ''}',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+            ),
           ],
         ),
         trailing: Row(
@@ -329,6 +333,7 @@ class CariAccountDetailScreen extends ConsumerWidget {
               if (context.mounted) {
                 Navigator.pop(context);
                 ref.invalidate(cariAccountProvider(accountId));
+                RefreshUtils.invalidateAllFinancialData(ref);
               }
             },
             child: const Text('GÜNCELLE'),
@@ -351,6 +356,7 @@ class CariAccountDetailScreen extends ConsumerWidget {
               await ref.read(cariRepositoryProvider).deleteAccount(account.id);
               if (context.mounted) {
                 Navigator.pop(context); // Dialogu kapat
+                RefreshUtils.invalidateAllFinancialData(ref);
                 context.pop(); // Önceki sayfaya dön (Cari Listesi)
               }
             },
@@ -396,6 +402,7 @@ class CariAccountDetailScreen extends ConsumerWidget {
                 Navigator.pop(context);
                 ref.invalidate(cariAccountProvider(accountId));
                 ref.invalidate(cariTransactionsProvider(accountId));
+                RefreshUtils.invalidateAllFinancialData(ref);
               }
             },
             child: const Text('GÜNCELLE'),
@@ -420,6 +427,7 @@ class CariAccountDetailScreen extends ConsumerWidget {
                 Navigator.pop(context);
                 ref.invalidate(cariAccountProvider(accountId));
                 ref.invalidate(cariTransactionsProvider(accountId));
+                RefreshUtils.invalidateAllFinancialData(ref);
               }
             },
             child: const Text('SİL', style: TextStyle(color: Colors.red)),

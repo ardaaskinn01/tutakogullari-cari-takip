@@ -23,8 +23,14 @@ class StaffListScreen extends ConsumerWidget {
     final profilesAsync = ref.watch(allProfilesProvider);
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppConstants.adminDashboardRoute);
+      },
+      child: Scaffold(
+        appBar: AppBar(
         title: const Text('Personel Listesi'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -110,7 +116,7 @@ class StaffListScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Hata: $err')),
       ),
-    );
+      ));
   }
 
   void _showAddStaffDialog(BuildContext context, WidgetRef ref) {
