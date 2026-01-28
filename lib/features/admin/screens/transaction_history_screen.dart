@@ -82,7 +82,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
                   color: tx.isIncome ? Colors.green : Colors.red,
                   size: 16,
                 )),
-                DataCell(Text(tx.description)),
+                DataCell(Text(Helpers.cleanDescription(tx.description))),
                 DataCell(Text(tx.paymentMethod.displayName)),
                 DataCell(Text(tx.createdByName ?? '-')),
                 DataCell(Text(
@@ -127,7 +127,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
               tx.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
               color: tx.isIncome ? Colors.green : Colors.red,
             ),
-            title: Text(tx.description),
+            title: Text(Helpers.cleanDescription(tx.description)),
             subtitle: Text(
               '${DateFormat('dd.MM.yyyy HH:mm').format(tx.createdAt)} • ${tx.paymentMethod.displayName}${tx.createdByName != null ? ' • ${tx.createdByName}' : ''}',
               style: const TextStyle(fontSize: 12),

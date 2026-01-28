@@ -39,4 +39,16 @@ class Helpers {
     // At least 6 characters
     return password.length >= 6;
   }
+
+  // Description cleaning for internal tags
+  static String cleanDescription(String description) {
+    // Remove [CT#uuid] tags
+    if (description.startsWith('[CT#')) {
+      final closingBracketIndex = description.indexOf(']');
+      if (closingBracketIndex != -1) {
+        return description.substring(closingBracketIndex + 1).trim();
+      }
+    }
+    return description;
+  }
 }

@@ -189,7 +189,7 @@ class KasaDefteriScreen extends ConsumerWidget {
                                     color: tx.isIncome ? Colors.green : Colors.red,
                                     size: 16,
                                   )),
-                                  DataCell(Text(tx.description)),
+                                  DataCell(Text(Helpers.cleanDescription(tx.description))),
                                   DataCell(Text(tx.paymentMethod.displayName)),
                                   DataCell(Text(tx.createdByName ?? '-')),
                                   DataCell(Text(
@@ -254,7 +254,7 @@ class KasaDefteriScreen extends ConsumerWidget {
                   ),
                 ),
                 title: Text(
-                  tx.description,
+                  Helpers.cleanDescription(tx.description),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 subtitle: Column(
