@@ -2,80 +2,197 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
+import '../../../core/widgets/data_table_wrapper.dart';
 import '../../../models/mtul_calculation.dart';
 import '../../dashboard/repositories/mtul_repository.dart';
 
-// --- Family Provider ---
-// Tek bir hesaplamanın detayını çekmek için
+final mtulSummaryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repository = ref.watch(mtulRepositoryProvider);
+  return repository.getCustomerSummary();
+});
+
+final customerCalculationsProvider = FutureProvider.family<List<MtulCalculation>, String>((ref, customerName) async {
+  final repository = ref.watch(mtulRepositoryProvider);
+  final all = await repository.getCalculations();
+  return all.where((c) => c.customerName == customerName).toList();
+});
+
 final calculationDetailProvider = FutureProvider.family<MtulCalculation, String>((ref, id) async {
   final repository = ref.read(mtulRepositoryProvider);
   return repository.getCalculationDetail(id);
 });
 
-// Tüm geçmişi çeken provider
-final mtulHistoryProvider = FutureProvider<List<MtulCalculation>>((ref) async {
-  final repository = ref.watch(mtulRepositoryProvider);
-  return repository.getCalculations();
-});
-
-class MtulHistoryScreen extends ConsumerWidget {
+class MtulHistoryScreen extends ConsumerStatefulWidget {
   const MtulHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(mtulHistoryProvider);
+  ConsumerState<MtulHistoryScreen> createState() => _MtulHistoryScreenState();
+}
+
+class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
+  String? _selectedCustomer;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hesaplama Geçmişi'),
+        title: Text(_selectedCustomer == null ? 'Müşteri Özeti' : '$_selectedCustomer - Geçmiş'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (_selectedCustomer != null) {
+              setState(() => _selectedCustomer = null);
+            } else if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppConstants.adminDashboardRoute);
+            }
+          },
         ),
       ),
-      body: historyAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Hata: $err')),
-        data: (calculations) {
-          if (calculations.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                   Icon(Icons.history_toggle_off, size: 80, color: Colors.grey.shade600),
-                   const SizedBox(height: 16),
-                   const Text('Kayıtlı hesaplama yok.'),
-                ],
-              ),
-            );
-          }
+      body: _selectedCustomer == null 
+          ? _buildCustomerSummary(isDesktop) 
+          : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
+    );
+  }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: calculations.length,
-            itemBuilder: (context, index) {
-              final calc = calculations[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                    child: const Icon(Icons.description, color: Colors.blueAccent),
-                  ),
-                  title: Text(calc.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(Helpers.formatDateTime(calc.createdAt)),
-                  trailing: Text(
-                    Helpers.formatCurrency(calc.totalPrice),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
-                  ),
-                  onTap: () => _showDetailDialog(context, ref, calc.id),
+  Widget _buildCustomerSummary(bool isDesktop) {
+    final summaryAsync = ref.watch(mtulSummaryProvider);
+
+    return summaryAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Hata: $err')),
+      data: (summaryList) {
+        if (summaryList.isEmpty) {
+          return const Center(child: Text('Henüz kayıtlı hesaplama yok.'));
+        }
+        
+        summaryList.sort((a, b) => (b['last_order_date'] as DateTime).compareTo(a['last_order_date'] as DateTime));
+
+        if (isDesktop) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: DataTableWrapper(
+                  title: 'Müşteri Bazlı Metretül Özeti',
+                  columns: const [
+                    DataColumn(label: Text('Müşteri Adı')),
+                    DataColumn(label: Text('Toplam Sipariş'), numeric: true),
+                    DataColumn(label: Text('Son Sipariş')),
+                    DataColumn(label: Text('Toplam Ciro'), numeric: true),
+                  ],
+                  rows: summaryList.map((item) => DataRow(
+                    cells: [
+                      DataCell(Text(item['customer_name'], style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(Text(item['total_count'].toString())),
+                      DataCell(Text(Helpers.formatDate(item['last_order_date']))),
+                      DataCell(Text(
+                        Helpers.formatCurrency(item['total_amount']),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      )),
+                    ],
+                    onSelectChanged: (_) => setState(() => _selectedCustomer = item['customer_name']),
+                  )).toList(),
                 ),
-              ).animate().fadeIn(delay: (50 * index).ms).slideX();
-            },
+              ),
+            ),
           );
-        },
-      ),
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: summaryList.length,
+          itemBuilder: (context, index) {
+            final item = summaryList[index];
+            return Card(
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                  child: Text(
+                    (item['customer_name'] as String)[0].toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                  ),
+                ),
+                title: Text(item['customer_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: Text('${item['total_count']} Sipariş • Son: ${Helpers.formatDate(item['last_order_date'])}'),
+                trailing: Text(
+                  Helpers.formatCurrency(item['total_amount']),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                ),
+                onTap: () => setState(() => _selectedCustomer = item['customer_name']),
+              ),
+            ).animate().fadeIn(delay: (50 * index).ms).slideX();
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomerDetailList(String customerName, bool isDesktop) {
+    final historyAsync = ref.watch(customerCalculationsProvider(customerName));
+
+    return historyAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Hata: $err')),
+      data: (calculations) {
+        if (isDesktop) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: DataTableWrapper(
+                  title: '$customerName - Hesaplama Geçmişi',
+                  columns: const [
+                    DataColumn(label: Text('Tarih')),
+                    DataColumn(label: Text('Toplam Tutar'), numeric: true),
+                    DataColumn(label: Text('')),
+                  ],
+                  rows: calculations.map((calc) => DataRow(
+                    cells: [
+                      DataCell(Text(Helpers.formatDateTime(calc.createdAt))),
+                      DataCell(Text(
+                        Helpers.formatCurrency(calc.totalPrice),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                      )),
+                      DataCell(const Icon(Icons.chevron_right)),
+                    ],
+                    onSelectChanged: (_) => _showDetailDialog(context, ref, calc.id),
+                  )).toList(),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: calculations.length,
+          itemBuilder: (context, index) {
+            final calc = calculations[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                title: Text(Helpers.formatDateTime(calc.createdAt), style: const TextStyle(fontWeight: FontWeight.w500)),
+                trailing: Text(
+                  Helpers.formatCurrency(calc.totalPrice),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                ),
+                onTap: () => _showDetailDialog(context, ref, calc.id),
+              ),
+            ).animate().fadeIn(delay: (30 * index).ms).slideX();
+          },
+        );
+      },
     );
   }
 
@@ -89,7 +206,6 @@ class MtulHistoryScreen extends ConsumerWidget {
 
 class _DetailDialog extends ConsumerWidget {
   final String calculationId;
-
   const _DetailDialog({required this.calculationId});
 
   @override
@@ -103,8 +219,8 @@ class _DetailDialog extends ConsumerWidget {
         error: (err, stack) => Text('Hata: $err'),
         data: (calc) {
           final items = calc.items ?? [];
-          return SizedBox(
-            width: double.maxFinite,
+          return ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,7 +229,6 @@ class _DetailDialog extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text('Tarih: ${Helpers.formatDateTime(calc.createdAt)}', style: TextStyle(color: Colors.grey.shade400)),
                 const Divider(height: 32),
-                
                 Flexible(
                   child: ListView.separated(
                     shrinkWrap: true,
@@ -122,12 +237,8 @@ class _DetailDialog extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text('${item.quantity} x ${item.componentName}'),
-                          ),
+                          Expanded(flex: 3, child: Text('${item.quantity} x ${item.componentName}')),
                           Expanded(
                             flex: 2,
                             child: Text(
@@ -141,7 +252,6 @@ class _DetailDialog extends ConsumerWidget {
                     },
                   ),
                 ),
-                
                 const Divider(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -159,10 +269,7 @@ class _DetailDialog extends ConsumerWidget {
         },
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('KAPAT'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('KAPAT')),
       ],
     );
   }

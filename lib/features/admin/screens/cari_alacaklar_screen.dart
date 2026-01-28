@@ -27,10 +27,30 @@ class CariAlacaklarScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cari Alacaklar'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppConstants.adminDashboardRoute),
-        ),
+        leading: MediaQuery.of(context).size.width <= 900 
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.go(AppConstants.adminDashboardRoute),
+            )
+          : null,
+        actions: [
+          if (MediaQuery.of(context).size.width > 900) ...[
+            FilledButton.icon(
+              onPressed: () => _showAddTahsilatDialog(context, ref),
+              icon: const Icon(Icons.download),
+              label: const Text('Tahsilat Ekle'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.green.shade700),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: () => _showAddAlacakDialog(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('Alacak Ekle'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            ),
+            const SizedBox(width: 16),
+          ],
+        ],
       ),
       body: accountsAsync.when(
         data: (accounts) {
@@ -100,28 +120,30 @@ class CariAlacaklarScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Hata: $err')),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Tahsilat Ekle Butonu (Yeşil)
-          FloatingActionButton.extended(
-            heroTag: 'tahsilatBtn',
-            onPressed: () => _showAddTahsilatDialog(context, ref),
-            icon: const Icon(Icons.download),
-            label: const Text('Tahsilat Ekle'),
-            backgroundColor: Colors.green.shade700,
-          ),
-          const SizedBox(height: 16),
-          // Alacak Ekle Butonu (Kırmızı)
-          FloatingActionButton.extended(
-            heroTag: 'alacakBtn',
-            onPressed: () => _showAddAlacakDialog(context, ref),
-            icon: const Icon(Icons.add),
-            label: const Text('Alacak Ekle'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        ],
-      ),
+      floatingActionButton: MediaQuery.of(context).size.width <= 900 
+        ? Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Tahsilat Ekle Butonu (Yeşil)
+              FloatingActionButton.extended(
+                heroTag: 'tahsilatBtn',
+                onPressed: () => _showAddTahsilatDialog(context, ref),
+                icon: const Icon(Icons.download),
+                label: const Text('Tahsilat Ekle'),
+                backgroundColor: Colors.green.shade700,
+              ),
+              const SizedBox(height: 16),
+              // Alacak Ekle Butonu (Kırmızı)
+              FloatingActionButton.extended(
+                heroTag: 'alacakBtn',
+                onPressed: () => _showAddAlacakDialog(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Alacak Ekle'),
+                backgroundColor: Colors.red.shade700,
+              ),
+            ],
+          )
+        : null,
     );
   }
 
@@ -209,38 +231,59 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
+    
     return AlertDialog(
       title: const Text('Yeni Alacak Ekle'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Kişi Adı Soyadı', prefixIcon: Icon(Icons.person)),
-                validator: (v) => v!.isEmpty ? 'İsim gerekli' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Telefon No (Opsiyonel)', prefixIcon: Icon(Icons.phone)),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Alacak Miktarı', prefixText: '₺ '),
-                validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'Not / Açıklama', hintText: 'Örn: Ocak ayı borcu'),
-              ),
-            ],
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: isDesktop ? 600 : 400),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Kişi Adı Soyadı', prefixIcon: Icon(Icons.person)),
+                  validator: (v) => v!.isEmpty ? 'İsim gerekli' : null,
+                ),
+                const SizedBox(height: 16),
+                if (isDesktop)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _amountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(labelText: 'Alacak Miktarı', prefixText: '₺ '),
+                          validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _descController,
+                          decoration: const InputDecoration(labelText: 'Not / Açıklama'),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  TextFormField(
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Alacak Miktarı', prefixText: '₺ '),
+                    validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _descController,
+                    decoration: const InputDecoration(labelText: 'Not / Açıklama'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -269,7 +312,6 @@ class AddTahsilatDialog extends ConsumerStatefulWidget {
 class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  final _descController = TextEditingController();
   
   String? _selectedAccountId;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cash;
@@ -299,7 +341,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
         type: CariTransactionType.collection, // Tahsilat
         amount: amount,
         paymentMethod: _selectedPaymentMethod, // Nakit/Kart/Çek
-        description: _descController.text.isEmpty ? 'Tahsilat' : _descController.text,
+        description: 'Tahsilat',
         createdAt: DateTime.now(),
       );
       
@@ -323,6 +365,8 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
+    
     // Dropdown için kişileri mapleyelim
     final accountItems = widget.accounts.map((acc) {
       return DropdownMenuItem(
@@ -333,9 +377,11 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
 
     return AlertDialog(
       title: const Text('Tahsilat Ekle', style: TextStyle(color: Colors.green)),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: isDesktop ? 600 : 400),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -365,21 +411,15 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
                ),
               const SizedBox(height: 16),
 
-              // Tutar
-              TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Tahsilat Tutarı', prefixText: '₺ '),
-                validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
-              ),
-              const SizedBox(height: 16),
-              
-              // Açıklama
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'Açıklama', hintText: 'Örn: Elden alındı'),
-              ),
-            ],
+                // Tutar
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Tahsilat Tutarı', prefixText: '₺ '),
+                  validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
+                ),
+              ],
+            ),
           ),
         ),
       ),

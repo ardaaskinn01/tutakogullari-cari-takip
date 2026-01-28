@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
+import '../../../core/widgets/data_table_wrapper.dart';
 import '../../dashboard/repositories/glass_repository.dart';
 
-// Müşteri Özet Provider'ı
 final glassSummaryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repository = ref.watch(glassRepositoryProvider);
   return repository.getCustomerSummary();
@@ -17,13 +18,20 @@ class GlassHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(glassSummaryProvider);
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Müşteri Sipariş Özeti'),
+        title: const Text('Müşteri Özeti'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppConstants.adminDashboardRoute);
+            }
+          },
         ),
       ),
       body: summaryAsync.when(
@@ -34,8 +42,38 @@ class GlassHistoryScreen extends ConsumerWidget {
             return const Center(child: Text('Henüz kayıtlı hesaplama yok.'));
           }
           
-          // Son sipariş tarihine göre sırala
           summaryList.sort((a, b) => (b['last_order_date'] as DateTime).compareTo(a['last_order_date'] as DateTime));
+
+          if (isDesktop) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: DataTableWrapper(
+                    title: 'Müşteri Bazlı Cam m² Özeti',
+                    columns: const [
+                      DataColumn(label: Text('Müşteri Adı')),
+                      DataColumn(label: Text('Toplam Sipariş'), numeric: true),
+                      DataColumn(label: Text('Son Sipariş')),
+                      DataColumn(label: Text('Toplam Ciro'), numeric: true),
+                    ],
+                    rows: summaryList.map((item) => DataRow(
+                      cells: [
+                        DataCell(Text(item['customer_name'], style: const TextStyle(fontWeight: FontWeight.bold))),
+                        DataCell(Text(item['total_count'].toString())),
+                        DataCell(Text(Helpers.formatDate(item['last_order_date']))),
+                        DataCell(Text(
+                          Helpers.formatCurrency(item['total_amount']),
+                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                        )),
+                      ],
+                    )).toList(),
+                  ),
+                ),
+              ),
+            );
+          }
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -61,23 +99,10 @@ class GlassHistoryScreen extends ConsumerWidget {
                   subtitle: Text(
                     '${item['total_count']} Sipariş • Son: ${Helpers.formatDate(item['last_order_date'])}',
                   ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text('Toplam Ciro', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                      Text(
-                        Helpers.formatCurrency(item['total_amount']),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
-                      ),
-                    ],
+                  trailing: Text(
+                    Helpers.formatCurrency(item['total_amount']),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
                   ),
-                  onTap: () {
-                    // İleride buraya tıklanınca o müşterinin detay dökümü eklenebilir
-                    ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(content: Text('Müşteri detayları listesi yakında eklenecek.')),
-                    );
-                  },
                 ),
               ).animate().fadeIn(delay: (50 * index).ms).slideX();
             },

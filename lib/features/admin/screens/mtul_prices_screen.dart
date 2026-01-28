@@ -15,31 +15,40 @@ final mtulPricesProvider = FutureProvider.family<List<MtulPrice>, String>((ref, 
   List<String> defaults = [];
   if (category == 'standard') {
     defaults = [
-      '60 Kasa Beyaz 1.6', '60 Kasa Beyaz 2.2',
-      '70 Kasa Beyaz 1.6', '70 Kasa Beyaz 2.2',
-      'Pencere Kanat 1.6', 'Pencere Kanat 2.2',
-      'Kapı Kanat 1.6', 'Kapı Kanat 2.2',
-      '70 Orta Kayıt 1.6', '70 Orta Kayıt 2.2',
-      '60 Orta Kayıt 1.6', '60 Orta Kayıt 2.2',
-      'Çift Cam Çıtası', 'Tek Cam Çıtası',
-      'Lambri', 'U Kasa', 'Mermer Afyon'
+      "60 Kasa Beyaz 1.6",
+      "60 Kasa Beyaz 2.2",
+      "70 Kasa Beyaz 1.6",
+      "70 Kasa Beyaz 2.2",
+      "Pencere Kanat 1.6",
+      "Pencere Kanat 2.2",
+      "Kapı Kanat 1.6",
+      "Kapı Kanat 2.2",
+      "70 Orta Kayıt 1.6",
+      "70 Orta Kayıt 2.2",
+      "60 Orta Kayıt 1.6",
+      "60 Orta Kayıt 2.2",
+      "Çift Cam Çıtası",
+      "Tek Cam Çıtası",
+      "Lambri",
+      "U Kasa",
+      "Mermer Afyon"
     ];
   } else if (category == 'gold_oak' || category == 'anthracite') {
     defaults = [
-      '70 Kasa',
-      'Pencere Kanat',
-      'Kapı Kanat',
-      '70 Orta Kayıt',
-      '60 Orta Kayıt',
-      'Çift Cam Çıtası',
-      'Tek Cam Çıtası'
+      "70 Kasa",
+      "Pencere Kanat",
+      "Kapı Kanat",
+      "70 Orta Kayıt",
+      "60 Orta Kayıt",
+      "Çift Cam Çıtası",
+      "Tek Cam Çıtası"
     ];
   } else if (category == 'fly_screen') {
     defaults = [
-      'Menteşeli Pencere Sineklik',
-      'Menteşeli Kapı Sineklik',
-      'Pileli Pencere Sineklik',
-      'Pileli Kapı Sineklik'
+      "Menteşeli Pencere Sineklik",
+      "Menteşeli Kapı Sineklik",
+      "Pileli Pencere Sineklik",
+      "Pileli Kapı Sineklik"
     ];
   }
 

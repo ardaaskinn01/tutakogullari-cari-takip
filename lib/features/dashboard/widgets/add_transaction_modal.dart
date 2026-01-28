@@ -5,9 +5,14 @@ import '../../auth/services/auth_service.dart';
 import '../repositories/transaction_repository.dart';
 
 class AddTransactionModal extends ConsumerStatefulWidget {
+  final Transaction? initialTransaction;
   final VoidCallback onSuccess;
 
-  const AddTransactionModal({super.key, required this.onSuccess});
+  const AddTransactionModal({
+    super.key, 
+    this.initialTransaction,
+    required this.onSuccess
+  });
 
   @override
   ConsumerState<AddTransactionModal> createState() => _AddTransactionModalState();
@@ -24,6 +29,17 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.initialTransaction != null) {
+      _amountController.text = widget.initialTransaction!.amount.toString();
+      _descController.text = widget.initialTransaction!.description;
+      _selectedType = widget.initialTransaction!.type;
+      _selectedPaymentMethod = widget.initialTransaction!.paymentMethod;
+    }
+  }
+
+  @override
   void dispose() {
     _amountController.dispose();
     _descController.dispose();
@@ -36,28 +52,39 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
     setState(() => _isLoading = true);
 
     try {
+      final repository = ref.read(transactionRepositoryProvider);
       final user = ref.read(currentUserProvider).value;
       if (user == null) throw Exception('Kullanıcı oturumu bulunamadı');
 
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       
       final transaction = Transaction(
+        id: widget.initialTransaction?.id ?? '',
         type: _selectedType,
-        paymentMethod: _selectedPaymentMethod, // Yeni alan
+        paymentMethod: _selectedPaymentMethod,
         amount: amount,
         description: _descController.text,
-        createdBy: user.id,
-        createdAt: DateTime.now(),
+        createdBy: widget.initialTransaction?.createdBy ?? user!.id,
+        createdAt: widget.initialTransaction?.createdAt ?? DateTime.now(),
       );
 
-      await ref.read(transactionRepositoryProvider).addTransaction(transaction);
+      if (widget.initialTransaction != null && widget.initialTransaction!.id != null) {
+        await repository.updateTransaction(widget.initialTransaction!.id!, transaction);
+      } else {
+        await repository.addTransaction(transaction);
+      }
 
       if (mounted) {
-        Navigator.pop(context); // Modalı kapat
-        widget.onSuccess(); // Sayfayı yenilemesi için callback tetikle
+        Navigator.pop(context);
+        widget.onSuccess();
         
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('${_selectedType.displayName} başarıyla eklendi'), backgroundColor: Colors.green),
+           SnackBar(
+             content: Text(widget.initialTransaction != null 
+               ? 'Kayıt güncellendi' 
+               : '${_selectedType.displayName} başarıyla eklendi'), 
+             backgroundColor: Colors.green
+           ),
         );
       }
     } catch (e) {
@@ -74,19 +101,19 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
   @override
   Widget build(BuildContext context) {
     // Koyu tema uyumluluğu için renkler
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
     final cardColor = Theme.of(context).cardTheme.color;
 
     return Container(
       decoration: BoxDecoration(
         color: cardColor, 
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: isDesktop ? BorderRadius.circular(20) : const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: isDesktop ? 24 : MediaQuery.of(context).viewInsets.bottom + 24,
         top: 24,
-        left: 20,
-        right: 20,
+        left: 24,
+        right: 24,
       ),
       child: Form(
         key: _formKey,
@@ -95,7 +122,7 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Yeni Kayıt Ekle',
+              widget.initialTransaction != null ? 'Kaydı Düzenle' : 'Yeni Kayıt Ekle',
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
@@ -195,7 +222,6 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
               controller: _descController,
               decoration: const InputDecoration(
                 labelText: 'Açıklama',
-                hintText: 'Örn: Ocak ayı kirası',
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Açıklama gerekli';

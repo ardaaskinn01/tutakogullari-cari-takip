@@ -64,4 +64,24 @@ class CariTransaction {
   
   bool get isDebt => type == CariTransactionType.debt;
   bool get isCollection => type == CariTransactionType.collection;
+
+  CariTransaction copyWith({
+    String? id,
+    String? accountId,
+    CariTransactionType? type,
+    double? amount,
+    PaymentMethod? paymentMethod,
+    String? description,
+    DateTime? createdAt,
+  }) {
+    return CariTransaction(
+      id: id ?? this.id,
+      accountId: accountId ?? this.accountId,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

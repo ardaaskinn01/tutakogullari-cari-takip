@@ -38,6 +38,36 @@ class CariAccountDetailScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'edit') _showEditAccountDialog(context, ref, accountAsync.value!);
+              if (value == 'delete') _confirmDeleteAccount(context, ref, accountAsync.value!);
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit', 
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20),
+                    SizedBox(width: 8),
+                    Text('Müşteriyi Düzenle'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete', 
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Müşteriyi Sil', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: accountAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -101,7 +131,7 @@ class CariAccountDetailScreen extends ConsumerWidget {
                           itemCount: transactions.length,
                           itemBuilder: (context, index) {
                             final tx = transactions[index];
-                            return _buildTransactionItem(context, tx, index);
+                            return _buildTransactionItem(context, ref, tx, index);
                           },
                         ),
                       ],
@@ -186,10 +216,10 @@ class CariAccountDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTransactionItem(BuildContext context, CariTransaction tx, int index) {
+  Widget _buildTransactionItem(BuildContext context, WidgetRef ref, CariTransaction tx, int index) {
     final isDebt = tx.isDebt;
     final color = isDebt ? Colors.red : Colors.green;
-    final icon = isDebt ? Icons.arrow_outward : Icons.arrow_downward; // Borç artıyor (out), Tahsilat düşüyor (down/in)
+    final icon = isDebt ? Icons.arrow_outward : Icons.arrow_downward; 
 
     return Card(
       elevation: 0,
@@ -225,15 +255,177 @@ class CariAccountDetailScreen extends ConsumerWidget {
             Text(Helpers.formatDateTime(tx.createdAt), style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
           ],
         ),
-        trailing: Text(
-          isDebt ? '+${Helpers.formatCurrency(tx.amount)}' : '-${Helpers.formatCurrency(tx.amount)}',
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isDebt ? '+${Helpers.formatCurrency(tx.amount)}' : '-${Helpers.formatCurrency(tx.amount)}',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') _showEditTransactionDialog(context, ref, tx);
+                if (value == 'delete') _confirmDeleteTransaction(context, ref, tx);
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit', 
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Düzenle'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete', 
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Sil', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     ).animate().fadeIn(delay: (50 * index).ms).slideX();
+  }
+
+  // --- Yardımcı Metodlar (Hesap İşlemleri) ---
+
+  void _showEditAccountDialog(BuildContext context, WidgetRef ref, CariAccount account) {
+    final nameController = TextEditingController(text: account.fullName);
+    final phoneController = TextEditingController(text: account.phone);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hesabı Düzenle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Ad Soyad')),
+            TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Telefon')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İPTAL')),
+          TextButton(
+            onPressed: () async {
+              await ref.read(cariRepositoryProvider).updateAccount(
+                account.id,
+                fullName: nameController.text.trim(),
+                phone: phoneController.text.trim(),
+              );
+              if (context.mounted) {
+                Navigator.pop(context);
+                ref.invalidate(cariAccountProvider(accountId));
+              }
+            },
+            child: const Text('GÜNCELLE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount(BuildContext context, WidgetRef ref, CariAccount account) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Müşteriyi Sil'),
+        content: Text('${account.fullName} müşterisini ve tüm işlem geçmişini silmek istediğinize emin misiniz?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İPTAL')),
+          TextButton(
+            onPressed: () async {
+              await ref.read(cariRepositoryProvider).deleteAccount(account.id);
+              if (context.mounted) {
+                Navigator.pop(context); // Dialogu kapat
+                context.pop(); // Önceki sayfaya dön (Cari Listesi)
+              }
+            },
+            child: const Text('SİL', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Yardımcı Metodlar (İşlem İşlemleri) ---
+
+  void _showEditTransactionDialog(BuildContext context, WidgetRef ref, CariTransaction tx) {
+    final amountController = TextEditingController(text: tx.amount.toString());
+    final descController = TextEditingController(text: tx.description);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tx.isDebt ? 'Düzenle' : 'Düzenle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Tutar', prefixText: '₺'),
+            ),
+            TextField(controller: descController, decoration: const InputDecoration(labelText: 'Açıklama')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İPTAL')),
+          TextButton(
+            onPressed: () async {
+              final amount = double.tryParse(amountController.text.replaceAll(',', '.')) ?? tx.amount;
+              final updatedTx = tx.copyWith(
+                amount: amount,
+                description: descController.text.trim(),
+              );
+              await ref.read(cariRepositoryProvider).updateTransaction(updatedTx);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ref.invalidate(cariAccountProvider(accountId));
+                ref.invalidate(cariTransactionsProvider(accountId));
+              }
+            },
+            child: const Text('GÜNCELLE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteTransaction(BuildContext context, WidgetRef ref, CariTransaction tx) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('İşlemi Sil'),
+        content: const Text('Bu işlem kaydını silmek istediğinize emin misiniz? Bakiye otomatik olarak güncellenecektir.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İPTAL')),
+          TextButton(
+            onPressed: () async {
+              await ref.read(cariRepositoryProvider).deleteTransaction(tx.id, accountId);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ref.invalidate(cariAccountProvider(accountId));
+                ref.invalidate(cariTransactionsProvider(accountId));
+              }
+            },
+            child: const Text('SİL', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 }

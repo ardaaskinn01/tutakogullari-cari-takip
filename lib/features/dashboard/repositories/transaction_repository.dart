@@ -121,6 +121,38 @@ class TransactionRepository {
       'check_expense': checkExpense,
     };
   }
+
+  // Update Transaction
+  Future<void> updateTransaction(String id, Transaction transaction) async {
+    final data = transaction.toJson();
+    data.remove('id');
+    data.remove('created_at'); 
+    data.remove('created_by_name');
+    
+    // Supabase update checks RLS. If no rows match or policy fails, it returns empty list.
+    final List<dynamic> response = await _supabase
+        .from('transactions')
+        .update(data)
+        .eq('id', id)
+        .select();
+
+    if (response.isEmpty) {
+      throw Exception('Güncelleme gerçekleştirilemedi. Yetki hatası olabilir veya kayıt bulunamadı.');
+    }
+  }
+
+  // Delete Transaction
+  Future<void> deleteTransaction(String id) async {
+    final List<dynamic> response = await _supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+        .select();
+
+    if (response.isEmpty) {
+      throw Exception('Silme gerçekleştirilemedi. Yetki hatası olabilir veya kayıt bulunamadı.');
+    }
+  }
 }
 
 // Repository Provider

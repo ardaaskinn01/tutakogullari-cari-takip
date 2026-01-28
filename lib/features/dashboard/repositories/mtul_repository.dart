@@ -17,7 +17,7 @@ class MtulRepository {
         .from('mtul_prices')
         .select()
         .eq('category', category)
-        .order('component_name');
+        .order('sort_order', ascending: true);
     
     return data.map((e) => MtulPrice.fromJson(e)).toList();
   }
@@ -30,21 +30,51 @@ class MtulRepository {
         .eq('id', id);
   }
 
-  // 3. Varsayılan Fiyatları Oluştur (Eğer yoksa)
+  // 3. Varsayılan Fiyatları Oluştur ve Düzenle
   Future<void> seedDefaultPrices(String category, List<String> components) async {
-    final existingParams = await getPrices(category);
-    // Hangi bileşenler eksik?
-    final existingNames = existingParams.map((e) => e.componentName).toSet();
-    final missing = components.where((c) => !existingNames.contains(c)).toList();
+    final List<dynamic> currentData = await _supabase
+        .from('mtul_prices')
+        .select()
+        .eq('category', category);
+    
+    final existingPrices = currentData.map((e) => MtulPrice.fromJson(e)).toList();
+    
+    // İşlem kolaylığı için mevcutları isim bazlı (küçük harf) haritaya alalım
+    final Map<String, MtulPrice> existingMap = {
+      for (var p in existingPrices) p.componentName.toLowerCase(): p
+    };
 
-    if (missing.isNotEmpty) {
-      final inserts = missing.map((name) => {
-        'category': category,
-        'component_name': name,
-        'unit_price': 0, // Varsayılan 0
-      }).toList();
+    // 1. İstenmeyen (listede olmayan) küçük harf hatalı veya eski kayıtları temizle
+    // Not: Sadece 'standard' kategorisi için bu temizliği yapmak daha güvenli olabilir
+    // Ancak kullanıcı "çift kere sıralanmış" dediği için tutarsızlığı gidermeliyiz.
+    final List<String> lowercaseDefaults = components.map((e) => e.toLowerCase()).toList();
+    for (var existing in existingPrices) {
+      if (!lowercaseDefaults.contains(existing.componentName.toLowerCase())) {
+        await _supabase.from('mtul_prices').delete().eq('id', existing.id);
+      }
+    }
 
-      await _supabase.from('mtul_prices').insert(inserts);
+    // 2. Listeyi Güncelle veya Ekle
+    for (int i = 0; i < components.length; i++) {
+      final targetName = components[i];
+      final lowerName = targetName.toLowerCase();
+      
+      if (existingMap.containsKey(lowerName)) {
+        final existing = existingMap[lowerName]!;
+        // Varsa ismini (casing) ve sırasını güncelle
+        await _supabase.from('mtul_prices').update({
+          'component_name': targetName,
+          'sort_order': i,
+        }).eq('id', existing.id);
+      } else {
+        // Yoksa ekle
+        await _supabase.from('mtul_prices').insert({
+          'category': category,
+          'component_name': targetName,
+          'unit_price': 0,
+          'sort_order': i,
+        });
+      }
     }
   }
 
@@ -96,6 +126,35 @@ class MtulRepository {
         .single();
     
     return MtulCalculation.fromJson(response);
+  }
+
+  // 7. Müşteri Bazlı Özet Raporu (Client-side Grouping)
+  Future<List<Map<String, dynamic>>> getCustomerSummary() async {
+    final calculations = await getCalculations();
+    
+    final Map<String, Map<String, dynamic>> summary = {};
+
+    for (var calc in calculations) {
+      if (!summary.containsKey(calc.customerName)) {
+        summary[calc.customerName] = {
+          'customer_name': calc.customerName,
+          'total_count': 0,
+          'total_amount': 0.0,
+          'last_order_date': calc.createdAt,
+        };
+      }
+      
+      summary[calc.customerName]!['total_count'] += 1;
+      summary[calc.customerName]!['total_amount'] += calc.totalPrice;
+      
+      // En son sipariş tarihini güncelle
+      final lastDate = summary[calc.customerName]!['last_order_date'] as DateTime;
+      if (calc.createdAt.isAfter(lastDate)) {
+        summary[calc.customerName]!['last_order_date'] = calc.createdAt;
+      }
+    }
+
+    return summary.values.toList();
   }
 }
 

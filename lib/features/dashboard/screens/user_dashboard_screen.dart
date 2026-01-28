@@ -6,6 +6,7 @@ import '../../../models/transaction.dart';
 import '../../auth/services/auth_service.dart';
 import '../repositories/transaction_repository.dart';
 import '../widgets/add_transaction_modal.dart';
+import '../../../core/widgets/side_menu.dart';
 
 // Sadece oturum açan kullanıcının işlemlerini getirir
 final userTransactionsProvider = FutureProvider<List<Transaction>>((ref) async {
@@ -16,7 +17,7 @@ final userTransactionsProvider = FutureProvider<List<Transaction>>((ref) async {
   if (user == null) return [];
   
   // isAdmin = false göndererek sadece kendi işlemlerini çekmesini sağlıyoruz
-  return repository.getTransactions(userId: user.id, isAdmin: false);
+  return repository.getTransactions(userId: user!.id, isAdmin: false);
 });
 
 class UserDashboardScreen extends ConsumerWidget {
@@ -28,6 +29,9 @@ class UserDashboardScreen extends ConsumerWidget {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
 
     return Scaffold(
+      drawer: MediaQuery.of(context).size.width <= 900 
+        ? const Drawer(child: SideMenu(isDrawer: true)) 
+        : null,
       appBar: AppBar(
         title: const Text('Personel Paneli'),
         actions: [

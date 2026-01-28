@@ -5,6 +5,9 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../models/glass_calculation.dart';
 import '../../dashboard/repositories/glass_repository.dart';
+import '../../../core/widgets/customer_autocomplete.dart';
+import '../../../core/services/customer_service.dart';
+import '../../../core/utils/keyboard_shortcuts.dart';
 
 class GlassCalculationScreen extends ConsumerStatefulWidget {
   const GlassCalculationScreen({super.key});
@@ -67,7 +70,10 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
       await repository.saveCalculation(calc);
 
       if (mounted) {
-        // Formu sıfırla (Müşteri adı ve birim fiyat kalabilir kolaylık olsun diye)
+        // Yeni bir müşteri eklenmiş olabileceği için listeyi yenile
+        ref.invalidate(allCustomerNamesProvider);
+        
+        // Formu temizle (Müşteri adı ve birim fiyat kalabilir kolaylık olsun diye)
         _widthController.clear();
         _heightController.clear();
         _calculate(); // Değerleri sıfırla
@@ -99,7 +105,7 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cam m² Hesapla'),
+        title: const Text('Cam m² Hesaplama'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go(AppConstants.adminDashboardRoute),
@@ -112,137 +118,149 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          onChanged: _calculate, // Her değişiklikte hesapla
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // MÜŞTERİ BİLGİSİ
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Müşteri Adı',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) => v!.isEmpty ? 'Gerekli' : null,
-              ),
-              const SizedBox(height: 24),
-              
-              // ÖLÇÜLER (YAN YANA)
-              Row(
+      body: KeyboardShortcuts(
+        onSave: _save,
+        child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              onChanged: _calculate, // Her değişiklikte hesapla
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _widthController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'En (Metre)',
-                        suffixText: 'm',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Gerekli' : null,
-                    ),
+                  // MÜŞTERİ BİLGİSİ
+                  CustomerAutocomplete(
+                    controller: _nameController,
+                    validator: (v) => v!.isEmpty ? 'Gerekli' : null,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _heightController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Boy (Metre)',
-                        suffixText: 'm',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Gerekli' : null,
-                    ),
+                  const SizedBox(height: 24),
+                  
+                  // ÖLÇÜLER VE ADET (RESPONSIVE GRID)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth > 600;
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _widthController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'En (Metre)',
+                                    suffixText: 'm',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (v) => v!.isEmpty ? 'Gerekli' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _heightController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Boy (Metre)',
+                                    suffixText: 'm',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (v) => v!.isEmpty ? 'Gerekli' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _quantityController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Adet',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (v) => v!.isEmpty ? 'Gerekli' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _priceController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'm² Birim Fiyatı',
+                                    suffixText: '₺',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                   validator: (v) => v!.isEmpty ? 'Gerekli' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // ADET VE FİYAT
-              Row(
-                children: [
-                   Expanded(
-                    child: TextFormField(
-                      controller: _quantityController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Adet',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Gerekli' : null,
+                  
+                  const SizedBox(height: 32),
+                  
+                  // SONUÇ KARTI
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardTheme.color,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 5))],
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'm² Birim Fiyatı',
-                        suffixText: '₺',
-                        border: OutlineInputBorder(),
-                      ),
-                       validator: (v) => v!.isEmpty ? 'Gerekli' : null,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // SONUÇ KARTI
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardTheme.color,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 5))],
-                ),
-                child: Column(
-                  children: [
-                    _ResultRow(label: 'Tekil m²', value: '${_singleM2.toStringAsFixed(2)} m²'),
-                    const Divider(),
-                    _ResultRow(label: 'Toplam m² (x${_quantityController.text})', value: '${_totalM2.toStringAsFixed(2)} m²', isBold: true),
-                    const Divider(),
-                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
                       children: [
-                        const Text('TOPLAM TUTAR', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(
-                          Helpers.formatCurrency(_totalPrice),
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigoAccent),
+                        _ResultRow(label: 'Tekil m²', value: '${_singleM2.toStringAsFixed(2)} m²'),
+                        const Divider(height: 24),
+                        _ResultRow(label: 'Toplam m² (x${_quantityController.text})', value: '${_totalM2.toStringAsFixed(2)} m²', isBold: true),
+                        const Divider(height: 24),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('TOPLAM TUTAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(
+                              Helpers.formatCurrency(_totalPrice),
+                              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.indigoAccent),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigoAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.save, size: 24, color: Colors.white),
+                      label: _isSaving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
+                          : const Text('HESABI KAYDET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+                    ),
+                  ),
+                ],
               ),
-              
-              const SizedBox(height: 32),
-              
-              ElevatedButton.icon(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigoAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                icon: const Icon(Icons.save),
-                label: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
-                    : const Text('HESABI KAYDET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    );
+    ));
   }
 }
 

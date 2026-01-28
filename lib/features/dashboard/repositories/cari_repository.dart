@@ -43,6 +43,20 @@ class CariRepository {
     return CariAccount.fromJson(response);
   }
 
+  // 4. Hesabı Güncelle
+  Future<void> updateAccount(String accountId, {required String fullName, String? phone}) async {
+    await _supabase.from('cari_accounts').update({
+      'full_name': fullName,
+      'phone': phone,
+    }).eq('id', accountId);
+  }
+
+  // 5. Hesabı Sil
+  Future<void> deleteAccount(String accountId) async {
+    // RLS ve Foreign Key kısıtlamalarına dikkat (Transactions otomatik silinebilir cascade ise)
+    await _supabase.from('cari_accounts').delete().eq('id', accountId);
+  }
+
 
   // --- Cari İşlem (Transaksiyon) İşlemleri ---
 
@@ -53,27 +67,25 @@ class CariRepository {
     txData.remove('id'); // ID otomatik oluşacak
     
     await _supabase.from('cari_transactions').insert(txData);
-
-    // B. Cari Hesap Bakiyesini Güncelle
-    // Mantık: Borç ise bakiye artar, Tahsilat ise bakiye azalır.
-    
-    // Önce mevcut bakiyeyi çekelim (Hata riskine karşı en güncel veriyi almak iyidir)
-    final account = await getAccountById(transaction.accountId);
-    double newBalance = account.currentBalance;
-
-    if (transaction.type == CariTransactionType.debt) {
-      newBalance += transaction.amount;
-    } else {
-      newBalance -= transaction.amount;
-    }
-
-    // Yeni bakiyeyi güncelle
-    await _supabase.from('cari_accounts').update({
-      'current_balance': newBalance
-    }).eq('id', transaction.accountId);
+    await _recalculateAccountBalance(transaction.accountId);
   }
 
-  // 5. Bir Hesabın İşlem Geçmişini Getir (Ekstre)
+  // 5. İşlemi Güncelle
+  Future<void> updateTransaction(CariTransaction transaction) async {
+    final txData = transaction.toJson();
+    final String id = txData.remove('id'); // update için ID lazım ama gövdede olmasın
+
+    await _supabase.from('cari_transactions').update(txData).eq('id', id);
+    await _recalculateAccountBalance(transaction.accountId);
+  }
+
+  // 6. İşlemi Sil
+  Future<void> deleteTransaction(String transactionId, String accountId) async {
+    await _supabase.from('cari_transactions').delete().eq('id', transactionId);
+    await _recalculateAccountBalance(accountId);
+  }
+
+  // 7. Bir Hesabın İşlem Geçmişini Getir (Ekstre)
   Future<List<CariTransaction>> getAccountTransactions(String accountId) async {
     final List<dynamic> data = await _supabase
         .from('cari_transactions')
@@ -82,6 +94,24 @@ class CariRepository {
         .order('created_at', ascending: false); // En yeniden eskiye
 
     return data.map((json) => CariTransaction.fromJson(json)).toList();
+  }
+
+  // Hesap Bakiyesini Tüm İşlemlere Göre Yeniden Hesapla
+  Future<void> _recalculateAccountBalance(String accountId) async {
+    final transactions = await getAccountTransactions(accountId);
+    double balance = 0;
+    
+    for (var tx in transactions) {
+      if (tx.type == CariTransactionType.debt) {
+        balance += tx.amount;
+      } else {
+        balance -= tx.amount;
+      }
+    }
+
+    await _supabase.from('cari_accounts').update({
+      'current_balance': balance
+    }).eq('id', accountId);
   }
 }
 

@@ -5,7 +5,10 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../models/mtul_price.dart';
 import '../../dashboard/repositories/mtul_repository.dart';
-import 'mtul_prices_screen.dart'; // Provider'ı kullanmak için
+import 'mtul_prices_screen.dart';
+import '../../../core/widgets/customer_autocomplete.dart';
+import '../../../core/services/customer_service.dart';
+import '../../../core/utils/keyboard_shortcuts.dart';
 
 class MtulCalculationScreen extends ConsumerStatefulWidget {
   const MtulCalculationScreen({super.key});
@@ -91,6 +94,9 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
       );
 
       if (mounted) {
+        // Yeni bir müşteri eklenmiş olabileceği için listeyi yenile
+        ref.invalidate(allCustomerNamesProvider);
+        
         // Formu temizle
         _customerNameController.clear();
         setState(() => _quantities.clear());
@@ -115,7 +121,7 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Metretül Hesapla'),
+        title: const Text('Metretül Hesaplama'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go(AppConstants.adminDashboardRoute),
@@ -136,177 +142,271 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // --- Üst Form (Müşteri & Kategori) ---
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Theme.of(context).cardTheme.color,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _customerNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Müşteri Adı / Proje',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) => v!.isEmpty ? 'Müşteri adı gerekli' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Kategori Seçin',
-                      prefixIcon: Icon(Icons.category),
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _categories.entries.map((e) {
-                      return DropdownMenuItem(value: e.key, child: Text(e.value));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                           _selectedCategory = val;
-                           _quantities.clear(); // Kategori değişince adetleri sıfırla
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // --- Hesaplama Listesi ---
-          Expanded(
-            child: pricesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => Center(child: Text('Hata: $err')),
-              data: (prices) {
-                if (prices.isEmpty) return const Center(child: Text('Fiyat listesi boş.'));
-
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: prices.length,
-                  separatorBuilder: (ctx, i) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final price = prices[index];
-                    final qty = _quantities[price.id] ?? 0;
-                    final total = qty * price.unitPrice;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Row(
-                        children: [
-                          // 1. Bileşen Adı ve Birim Fiyat
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(price.componentName, style: const TextStyle(fontWeight: FontWeight.w500)),
-                                Text(
-                                  'Birim: ${Helpers.formatCurrency(price.unitPrice)}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // 2. Adet Girişi
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              initialValue: qty > 0 ? qty.toString() : '', // 0 ise boş göster
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              textAlign: TextAlign.center,
-                              decoration: const InputDecoration(
-                                hintText: '0',
-                                contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              onChanged: (val) {
-                                setState(() {
-                                  _quantities[price.id] = double.tryParse(val.replaceAll(',', '.')) ?? 0;
-                                });
-                              },
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 16),
-
-                          // 3. Satır Toplamı
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              Helpers.formatCurrency(total),
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: total > 0 ? Colors.green : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-
-          // --- Alt Toplam ve Kaydet ---
-          pricesAsync.when(
-            data: (prices) {
-              final grandTotal = _calculateGrandTotal(prices);
-              return Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardTheme.color,
-                  boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black.withOpacity(0.2), offset: const Offset(0, -2))],
-                ),
-                child: SafeArea(
+      body: KeyboardShortcuts(
+        onSave: () {
+          final prices = ref.read(mtulPricesProvider(_selectedCategory)).value;
+          if (prices != null) _saveCalculation(prices);
+        },
+        child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              // --- Üst Form (Müşteri & Kategori) ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Theme.of(context).cardTheme.color,
+                child: Form(
+                  key: _formKey,
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('GENEL TOPLAM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text(
-                            Helpers.formatCurrency(grandTotal),
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
-                          ),
-                        ],
+                      CustomerAutocomplete(
+                        controller: _customerNameController,
+                        validator: (v) => v!.isEmpty ? 'Müşteri adı gerekli' : null,
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : () => _saveCalculation(prices),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: _isSaving 
-                             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
-                             : const Text('HESAPLAMAYI KAYDET', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      DropdownButtonFormField<String>(
+                        value: _selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Kategori Seçin',
+                          prefixIcon: Icon(Icons.category),
+                          border: OutlineInputBorder(),
                         ),
+                        items: _categories.entries.map((e) {
+                          return DropdownMenuItem(value: e.key, child: Text(e.value));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                               _selectedCategory = val;
+                               _quantities.clear(); // Kategori değişince adetleri sıfırla
+                            });
+                          }
+                        },
                       ),
                     ],
                   ),
                 ),
-              );
-            },
-            loading: () => const SizedBox(),
-            error: (_, __) => const SizedBox(),
+              ),
+    
+              // --- Hesaplama Listesi ---
+              Expanded(
+                child: pricesAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) => Center(child: Text('Hata: $err')),
+                  data: (prices) {
+                    if (prices.isEmpty) return const Center(child: Text('Fiyat listesi boş.'));
+    
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth > 700;
+                        
+                        if (isWide) {
+                          // Desktop: Grid Layout (2 columns)
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 3.5,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: prices.length,
+                            itemBuilder: (context, index) {
+                              final price = prices[index];
+                              final qty = _quantities[price.id] ?? 0;
+                              final total = qty * price.unitPrice;
+    
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).cardColor.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Bileşen Adı
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            price.componentName,
+                                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            Helpers.formatCurrency(price.unitPrice),
+                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Adet Girişi
+                                    SizedBox(
+                                      width: 70,
+                                      child: TextFormField(
+                                        initialValue: qty > 0 ? qty.toString() : '',
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: const InputDecoration(
+                                          hintText: '0',
+                                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _quantities[price.id] = double.tryParse(val.replaceAll(',', '.')) ?? 0;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Toplam
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        Helpers.formatCurrency(total),
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: total > 0 ? Colors.green : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        }
+                        
+                        // Mobile: List Layout
+                        return ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: prices.length,
+                          separatorBuilder: (ctx, i) => const Divider(),
+                          itemBuilder: (context, index) {
+                            final price = prices[index];
+                            final qty = _quantities[price.id] ?? 0;
+                            final total = qty * price.unitPrice;
+    
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(price.componentName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                        Text(
+                                          'Birim: ${Helpers.formatCurrency(price.unitPrice)}',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: TextFormField(
+                                      initialValue: qty > 0 ? qty.toString() : '',
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      textAlign: TextAlign.center,
+                                      decoration: const InputDecoration(
+                                        hintText: '0',
+                                        contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _quantities[price.id] = double.tryParse(val.replaceAll(',', '.')) ?? 0;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      Helpers.formatCurrency(total),
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: total > 0 ? Colors.green : Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+    
+              // --- Alt Toplam ve Kaydet ---
+              pricesAsync.when(
+                data: (prices) {
+                  final grandTotal = _calculateGrandTotal(prices);
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardTheme.color,
+                      boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black.withOpacity(0.2), offset: const Offset(0, -2))],
+                    ),
+                    child: SafeArea(
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('GENEL TOPLAM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text(
+                                Helpers.formatCurrency(grandTotal),
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : () => _saveCalculation(prices),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueAccent,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: _isSaving 
+                                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
+                                 : const Text('HESAPLAMAYI KAYDET', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const SizedBox(),
+                error: (_, __) => const SizedBox(),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    );
+    ));
   }
 }
