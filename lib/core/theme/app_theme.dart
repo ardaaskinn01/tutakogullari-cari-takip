@@ -27,7 +27,7 @@ class AppTheme {
         onError: Colors.white,
         onSurface: Colors.white,
       ),
-      scaffoldBackgroundColor: Colors.transparent, // Transparent for gradient
+      scaffoldBackgroundColor: const Color(0xFF1E1E2C), // Fixed: Solid color prevents iOS transition ghosting
       // Typography
       textTheme: GoogleFonts.interTextTheme()
           .apply(bodyColor: Colors.white, displayColor: Colors.white)
