@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/transaction.dart';
 import '../../auth/services/auth_service.dart';
 import '../repositories/transaction_repository.dart';
+import '../../../core/utils/helpers.dart';
 
 class AddTransactionModal extends ConsumerStatefulWidget {
   final Transaction? initialTransaction;
@@ -27,15 +28,34 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cash;
   
   bool _isLoading = false;
+  bool _useCustomDate = false;
+  DateTime? _selectedDate;
+  String? _extractedTag;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialTransaction != null) {
       _amountController.text = widget.initialTransaction!.amount.toString();
-      _descController.text = widget.initialTransaction!.description;
+      
+      // Handle the internal [CT#uuid] tags
+      final rawDesc = widget.initialTransaction!.description;
+      if (rawDesc.startsWith('[CT#')) {
+        final closingBracketIndex = rawDesc.indexOf(']');
+        if (closingBracketIndex != -1) {
+          _extractedTag = rawDesc.substring(0, closingBracketIndex + 1);
+          _descController.text = rawDesc.substring(closingBracketIndex + 1).trim();
+        } else {
+          _descController.text = rawDesc;
+        }
+      } else {
+        _descController.text = rawDesc;
+      }
+
       _selectedType = widget.initialTransaction!.type;
       _selectedPaymentMethod = widget.initialTransaction!.paymentMethod;
+      _selectedDate = widget.initialTransaction!.createdAt;
+      _useCustomDate = true;
     }
   }
 
@@ -44,6 +64,25 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
     _amountController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('tr', 'TR'),
+      helpText: 'İşlem Tarihini Seçin',
+      cancelText: 'İptal',
+      confirmText: 'Tamam',
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -58,14 +97,23 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
 
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       
+      // Tarih seçimi: Eğer özel tarih seçildiyse onu kullan, yoksa şimdiyi kullan
+      final transactionDate = _useCustomDate && _selectedDate != null 
+          ? _selectedDate! 
+          : DateTime.now();
+      
+      final finalDescription = _extractedTag != null 
+          ? '$_extractedTag ${_descController.text.trim()}'
+          : _descController.text.trim();
+
       final transaction = Transaction(
         id: widget.initialTransaction?.id ?? '',
         type: _selectedType,
         paymentMethod: _selectedPaymentMethod,
         amount: amount,
-        description: _descController.text,
+        description: finalDescription,
         createdBy: widget.initialTransaction?.createdBy ?? user!.id,
-        createdAt: widget.initialTransaction?.createdAt ?? DateTime.now(),
+        createdAt: transactionDate,
       );
 
       if (widget.initialTransaction != null && widget.initialTransaction!.id != null) {
@@ -132,15 +180,10 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
             Text('İşlem Türü', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             SegmentedButton<TransactionType>(
-              style: ButtonStyle(
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                     return Colors.white;
-                  }
-                  return Colors.grey.shade400;
-                }),
-                backgroundColor: WidgetStateProperty.all(Colors.transparent),
-                side: WidgetStateProperty.all(BorderSide(color: Colors.grey.shade700)),
+              style: SegmentedButton.styleFrom(
+                selectedForegroundColor: Colors.white,
+                selectedBackgroundColor: _selectedType == TransactionType.income ? Colors.green.shade700 : Colors.red.shade700,
+                side: BorderSide(color: Theme.of(context).dividerColor),
               ),
               segments: const [
                 ButtonSegment(
@@ -173,7 +216,7 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
                  border: OutlineInputBorder(),
                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                ),
-               dropdownColor: const Color(0xFF334155),
+               dropdownColor: Theme.of(context).cardTheme.color,
                items: PaymentMethod.values.map((method) {
                  IconData icon;
                  switch(method) {
@@ -185,7 +228,7 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
                    value: method,
                    child: Row(
                      children: [
-                       Icon(icon, size: 20, color: Colors.white70),
+                       Icon(icon, size: 20, color: Theme.of(context).iconTheme.color?.withOpacity(0.7)),
                        const SizedBox(width: 8),
                        Text(method.displayName),
                      ],
@@ -228,6 +271,59 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
                 return null;
               },
             ),
+            const SizedBox(height: 16),
+
+            // Eski Tarih Seçimi
+            Row(
+              children: [
+                Checkbox(
+                  value: _useCustomDate,
+                  onChanged: (value) {
+                    setState(() {
+                      _useCustomDate = value ?? false;
+                      if (_useCustomDate && _selectedDate == null) {
+                        _selectedDate = DateTime.now();
+                      }
+                    });
+                  },
+                ),
+                Expanded(
+                  child: Text(
+                    'Eski tarihli işlem ekle',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            
+            if (_useCustomDate) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _selectDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        _selectedDate != null 
+                            ? Helpers.formatDate(_selectedDate!)
+                            : 'Tarih Seçin',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Spacer(),
+                      Icon(Icons.arrow_drop_down, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 32),
 
             // Kaydet Butonu

@@ -147,21 +147,33 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final activeColor = theme.primaryColor;
+    final inactiveColor = theme.textTheme.bodyMedium?.color ?? (isDark ? Colors.white70 : Colors.black87);
+    final activeTextColor = isDark ? Colors.white : theme.primaryColor;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: ListTile(
         onTap: onTap,
         selected: isActive,
-        leading: Icon(icon, color: iconColor ?? (isActive ? Theme.of(context).primaryColor : Colors.white70)),
+        leading: Icon(
+          icon, 
+          color: iconColor ?? (isActive ? activeColor : inactiveColor),
+          size: 22,
+        ),
         title: Text(
           title,
           style: TextStyle(
-            color: isActive ? Colors.white : Colors.white70,
+            color: isActive ? activeTextColor : inactiveColor,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
           ),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        selectedTileColor: Theme.of(context).primaryColor.withOpacity(0.1),
+        selectedTileColor: theme.primaryColor.withOpacity(0.1),
       ),
     );
   }

@@ -6,7 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../models/cari_account.dart';
 import '../../../models/cari_transaction.dart';
-import '../../../models/transaction.dart'; // TransactionType (Sadece helper olarak, enum PaymentMethod için)
+import '../../../models/transaction.dart';
 import '../../dashboard/repositories/cari_repository.dart';
 import '../../auth/services/auth_service.dart';
 import '../../../core/utils/refresh_utils.dart';
@@ -67,7 +67,7 @@ class CariAlacaklarScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                   Icon(Icons.account_balance_wallet_outlined, size: 80, color: Colors.grey.shade600),
+                   Icon(Icons.account_balance_wallet_outlined, size: 80, color: Theme.of(context).disabledColor),
                    const SizedBox(height: 16),
                    const Text('Kayıtlı alacak bulunamadı.'),
                    const SizedBox(height: 8),
@@ -102,9 +102,9 @@ class CariAlacaklarScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
+                      Text(
                         'Güncel Borç',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor),
                       ),
                       Text(
                         Helpers.formatCurrency(account.currentBalance),
@@ -194,6 +194,27 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   bool _isLoading = false;
+  bool _useCustomDate = false;
+  DateTime? _selectedDate;
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('tr', 'TR'),
+      helpText: 'İşlem Tarihini Seçin',
+      cancelText: 'İptal',
+      confirmText: 'Tamam',
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -211,6 +232,10 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       if (amount > 0) {
         final user = ref.read(currentUserProvider).value;
+        final transactionDate = _useCustomDate && _selectedDate != null 
+            ? _selectedDate! 
+            : DateTime.now();
+        
         final tx = CariTransaction(
           id: '',
           accountId: accountId,
@@ -218,7 +243,7 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
           amount: amount,
           description: _descController.text.isEmpty ? 'Açılış Bakiyesi' : _descController.text,
           createdBy: user?.id ?? '',
-          createdAt: DateTime.now(),
+          createdAt: transactionDate,
         );
         await repository.addTransaction(tx);
       }
@@ -291,6 +316,42 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
                     controller: _descController,
                     decoration: const InputDecoration(labelText: 'Not / Açıklama'),
                   ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _useCustomDate,
+                        onChanged: (value) {
+                          setState(() {
+                            _useCustomDate = value ?? false;
+                            if (_useCustomDate && _selectedDate == null) {
+                              _selectedDate = DateTime.now();
+                            }
+                          });
+                        },
+                      ),
+                      const Expanded(
+                        child: Text('Eski tarihli işlem'),
+                      ),
+                    ],
+                  ),
+                  if (_useCustomDate) ...[
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _selectDate,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'İşlem Tarihi',
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(
+                          _selectedDate != null 
+                              ? Helpers.formatDate(_selectedDate!)
+                              : 'Tarih Seçin',
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -326,6 +387,8 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
   String? _selectedAccountId;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cash;
   bool _isLoading = false;
+  bool _useCustomDate = false;
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -333,6 +396,25 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
     // İlk kişiyi varsayılan seç
     if (widget.accounts.isNotEmpty) {
       _selectedAccountId = widget.accounts.first.id;
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('tr', 'TR'),
+      helpText: 'İşlem Tarihini Seçin',
+      cancelText: 'İptal',
+      confirmText: 'Tamam',
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
     }
   }
 
@@ -346,6 +428,10 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
       final amount = double.parse(_amountController.text.replaceAll(',', '.'));
       
       final user = ref.read(currentUserProvider).value;
+      final transactionDate = _useCustomDate && _selectedDate != null 
+          ? _selectedDate! 
+          : DateTime.now();
+      
       final tx = CariTransaction(
         id: '',
         accountId: _selectedAccountId!,
@@ -354,7 +440,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
         paymentMethod: _selectedPaymentMethod, // Nakit/Kart/Çek
         description: 'Tahsilat',
         createdBy: user?.id ?? '',
-        createdAt: DateTime.now(),
+        createdAt: transactionDate,
       );
       
       await repository.addTransaction(tx);
@@ -430,6 +516,45 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
                   decoration: const InputDecoration(labelText: 'Tahsilat Tutarı', prefixText: '₺ '),
                   validator: (v) => v!.isEmpty ? 'Tutar gerekli' : null,
                 ),
+                const SizedBox(height: 16),
+                
+                // Eski Tarih Seçimi
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _useCustomDate,
+                      onChanged: (value) {
+                        setState(() {
+                          _useCustomDate = value ?? false;
+                          if (_useCustomDate && _selectedDate == null) {
+                            _selectedDate = DateTime.now();
+                          }
+                        });
+                      },
+                    ),
+                    const Expanded(
+                      child: Text('Eski tarihli işlem'),
+                    ),
+                  ],
+                ),
+                
+                if (_useCustomDate) ...[
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _selectDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'İşlem Tarihi',
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Text(
+                        _selectedDate != null 
+                            ? Helpers.formatDate(_selectedDate!)
+                            : 'Tarih Seçin',
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

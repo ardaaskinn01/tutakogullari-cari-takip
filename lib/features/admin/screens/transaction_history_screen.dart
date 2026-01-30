@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-// ÖNEMLİ: Aşağıdaki provider'ların tanımlı olduğu dosyaları doğru import ettiğinden emin ol
-// Örn: import '../../dashboard/providers/dashboard_providers.dart';
-
 import '../../../core/utils/helpers.dart';
 import '../../../core/widgets/data_table_wrapper.dart';
 import '../../../models/transaction.dart';

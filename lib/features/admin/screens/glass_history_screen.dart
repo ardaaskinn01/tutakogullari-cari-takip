@@ -166,7 +166,7 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
                   rows: calculations.map((calc) => DataRow(
                     cells: [
                       DataCell(Text(Helpers.formatDateTime(calc.createdAt))),
-                      DataCell(Text('${calc.height} x ${calc.width} m')),
+                      DataCell(Text('${calc.height} x ${calc.width} cm')),
                       DataCell(Text('${calc.quantity} Adet')),
                       DataCell(Text(
                         Helpers.formatCurrency(calc.totalPrice),
@@ -191,7 +191,7 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 title: Text(Helpers.formatDateTime(calc.createdAt), style: const TextStyle(fontWeight: FontWeight.w500)),
-                subtitle: Text('${calc.height}x${calc.width}m • ${calc.quantity} Adet • ${calc.totalM2.toStringAsFixed(2)} m²'),
+                subtitle: Text('${calc.height}x${calc.width}cm • ${calc.quantity} Adet • ${calc.totalM2.toStringAsFixed(2)} m²'),
                 trailing: Text(
                   Helpers.formatCurrency(calc.totalPrice),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
@@ -220,8 +220,8 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
               const SizedBox(height: 4),
               Text('Tarih: ${Helpers.formatDateTime(calc.createdAt)}', style: TextStyle(color: Colors.grey.shade400)),
               const Divider(height: 32),
-              _DetailRow(label: 'En', value: '${calc.width} m'),
-              _DetailRow(label: 'Boy', value: '${calc.height} m'),
+              _DetailRow(label: 'En', value: '${calc.width} cm'),
+              _DetailRow(label: 'Boy', value: '${calc.height} cm'),
               _DetailRow(label: 'Tekil m²', value: '${calc.m2.toStringAsFixed(2)} m²'),
               _DetailRow(label: 'Adet', value: '${calc.quantity}'),
               _DetailRow(label: 'Toplam m²', value: '${calc.totalM2.toStringAsFixed(2)} m²', isBold: true),

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
-import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart';
-import 'core/constants/app_constants.dart';
-import 'features/auth/services/supabase_service.dart';
+import 'package:is_takip/core/theme/app_theme.dart';
+import 'package:is_takip/core/theme/theme_provider.dart';
+import 'package:is_takip/core/router/app_router.dart';
+import 'package:is_takip/core/constants/app_constants.dart';
+import 'package:is_takip/features/auth/services/supabase_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +21,7 @@ void main() async {
   await initializeSupabase();
   
   // Desktop Window Configuration
-  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux)) {
     await windowManager.ensureInitialized();
     
     const windowOptions = WindowOptions(
@@ -38,7 +40,17 @@ void main() async {
     });
   }
   
-  runApp(const ProviderScope(child: MyApp()));
+  // Initialize SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 
@@ -49,11 +61,14 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
+      themeMode: themeMode,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       routerConfig: router,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -66,19 +81,25 @@ class MyApp extends ConsumerWidget {
       ],
       locale: const Locale('tr', 'TR'),
       builder: (context, child) {
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF1E1E2C), // Derin Lacivert (Dark Navy)
-                Color(0xFF000000), // Tam Siyah
-              ],
+        // Only apply the dark gradient background in Dark Mode
+        if (themeMode == ThemeMode.dark) {
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF1E1E2C), // Derin Lacivert (Dark Navy)
+                  Color(0xFF000000), // Tam Siyah
+                ],
+              ),
             ),
-          ),
-          child: child,
-        );
+            child: child,
+          );
+        }
+        
+        // In Light Mode, just return the child (let Scaffold background take over)
+        return child!;
       },
     );
   }

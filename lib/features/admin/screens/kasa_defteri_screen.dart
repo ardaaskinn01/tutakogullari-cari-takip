@@ -107,7 +107,7 @@ class KasaDefteriScreen extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white24),
+                          border: Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -241,7 +241,7 @@ class KasaDefteriScreen extends ConsumerWidget {
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Colors.white10),
+                side: BorderSide(color: Theme.of(context).dividerColor),
               ),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -300,7 +300,7 @@ class KasaDefteriScreen extends ConsumerWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Colors.white10),
+        side: BorderSide(color: Theme.of(context).dividerColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -308,20 +308,20 @@ class KasaDefteriScreen extends ConsumerWidget {
           children: [
             Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 20),
-            _buildSummaryRow('Nakit', cash),
-            const Divider(color: Colors.white10),
-            _buildSummaryRow('Kredi Kartı', card),
-            const Divider(color: Colors.white10),
-            _buildSummaryRow('Çek / Senet', check),
-            const Divider(color: Colors.white24, thickness: 1.5),
-            _buildSummaryRow('TOPLAM', total, isBold: true, color: color),
+            _buildSummaryRow(context, 'Nakit', cash),
+            Divider(color: Theme.of(context).dividerColor),
+            _buildSummaryRow(context, 'Kredi Kartı', card),
+            Divider(color: Theme.of(context).dividerColor),
+            _buildSummaryRow(context, 'Çek / Senet', check),
+            Divider(color: Theme.of(context).dividerColor, thickness: 1.5),
+            _buildSummaryRow(context, 'TOPLAM', total, isBold: true, color: color),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, {bool isBold = false, Color? color}) {
+  Widget _buildSummaryRow(BuildContext context, String label, double amount, {bool isBold = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -332,7 +332,7 @@ class KasaDefteriScreen extends ConsumerWidget {
             Helpers.formatCurrency(amount),
             style: TextStyle(
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color ?? (isBold ? null : Colors.white70),
+              color: color ?? (isBold ? null : Theme.of(context).textTheme.bodyMedium?.color),
               fontSize: isBold ? 16 : 14,
             ),
           ),

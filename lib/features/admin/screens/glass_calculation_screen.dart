@@ -42,7 +42,7 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
     final unitPrice = double.tryParse(_priceController.text.replaceAll(',', '.')) ?? 0;
 
     setState(() {
-      _singleM2 = width * height;
+      _singleM2 = (width * height) / 10000;
       _totalM2 = _singleM2 * qty;
       _totalPrice = _totalM2 * unitPrice;
     });
@@ -159,8 +159,8 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
                                   controller: _widthController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   decoration: const InputDecoration(
-                                    labelText: 'En (Metre)',
-                                    suffixText: 'm',
+                                    labelText: 'En (cm)',
+                                    suffixText: 'cm',
                                     border: OutlineInputBorder(),
                                   ),
                                   validator: (v) => v!.isEmpty ? 'Gerekli' : null,
@@ -172,8 +172,8 @@ class _GlassCalculationScreenState extends ConsumerState<GlassCalculationScreen>
                                   controller: _heightController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   decoration: const InputDecoration(
-                                    labelText: 'Boy (Metre)',
-                                    suffixText: 'm',
+                                    labelText: 'Boy (cm)',
+                                    suffixText: 'cm',
                                     border: OutlineInputBorder(),
                                   ),
                                   validator: (v) => v!.isEmpty ? 'Gerekli' : null,

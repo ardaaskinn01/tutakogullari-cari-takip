@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 
 /// Context menu region for desktop right-click actions
 class ContextMenuRegion extends StatelessWidget {
@@ -28,7 +28,10 @@ class ContextMenuRegion extends StatelessWidget {
   }
 
   bool _isDesktop() {
-    return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.windows || 
+           defaultTargetPlatform == TargetPlatform.macOS || 
+           defaultTargetPlatform == TargetPlatform.linux;
   }
 
   void _showContextMenu(BuildContext context, Offset position) {

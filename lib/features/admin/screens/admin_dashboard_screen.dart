@@ -10,6 +10,7 @@ import '../../dashboard/repositories/transaction_repository.dart';
 import '../../dashboard/widgets/add_transaction_modal.dart';
 import '../../../core/utils/refresh_utils.dart';
 import '../../../core/widgets/side_menu.dart';
+import '../../../core/widgets/theme_toggle_button.dart';
 
 // Providers for dashboard state
 final balanceProvider = FutureProvider<Map<String, double>>((ref) {
@@ -74,6 +75,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             )
           : null,
         actions: [
+          const ThemeToggleButton(),
           // Masaüstünde FAB yerine AppBar'da buton göster
           if (MediaQuery.of(context).size.width > 900)
             Padding(
@@ -359,10 +361,6 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 }
 
-// ... _SummaryCard ve AddStaffDialog sınıfları aynı, kod tekrarını önlemek için buraya yazmıyorum, 
-// ancak dosya içeriği tamamen değiştiği için onları da eklemem gerekir mantıken. 
-// Aşağıya mevcut _SummaryCard ve AddStaffDialog'u da ekliyorum.
-
 class _SummaryCard extends StatelessWidget {
   final String title;
   final double amount;
@@ -385,7 +383,14 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color, // Tema rengi
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: Theme.of(context).dividerTheme.color ?? Colors.grey.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,9 +400,9 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: TextStyle(
-                  color: Colors.grey.shade400,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                 ),
               ),
               Icon(icon, color: color, size: 20),
@@ -409,7 +414,7 @@ class _SummaryCard extends StatelessWidget {
             style: TextStyle(
               fontSize: isLarge ? 32 : 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).textTheme.displayLarge?.color,
             ),
           ),
         ],
@@ -417,5 +422,3 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-
-

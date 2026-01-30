@@ -140,7 +140,6 @@ class _MtulCalculationScreenState extends ConsumerState<MtulCalculationScreen> {
             onPressed: () => context.push(AppConstants.mtulPricesRoute),
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('Fiyatlar'),
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
           ),
           // Geçmiş Butonu
           IconButton(

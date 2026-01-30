@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart'; // Add this import
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../models/transaction.dart';
 import '../../auth/services/auth_service.dart';
@@ -8,6 +8,7 @@ import '../repositories/transaction_repository.dart';
 import '../widgets/add_transaction_modal.dart';
 import '../../../core/utils/refresh_utils.dart';
 import '../../../core/widgets/side_menu.dart';
+import '../../../core/widgets/theme_toggle_button.dart';
 
 // Sadece oturum açan kullanıcının işlemlerini getirir
 final userTransactionsProvider = FutureProvider<List<Transaction>>((ref) async {
@@ -60,6 +61,7 @@ class UserDashboardScreen extends ConsumerWidget {
         appBar: AppBar(
         title: const Text('Personel Paneli'),
         actions: [
+          const ThemeToggleButton(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -89,9 +91,7 @@ class UserDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 'Eklediğiniz işlemler aşağıdadır.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
               
@@ -133,11 +133,11 @@ class UserDashboardScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history_edu, size: 80, color: Colors.grey.shade200),
+            Icon(Icons.history_edu, size: 80, color: Theme.of(context).disabledColor),
             const SizedBox(height: 16),
             Text(
               'Henüz işlem eklemediniz.',
-              style: TextStyle(color: Colors.grey.shade500),
+              style: TextStyle(color: Theme.of(context).hintColor),
             ),
           ],
         ),
@@ -154,7 +154,7 @@ class UserDashboardScreen extends ConsumerWidget {
           elevation: 0,
           color: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
-            side: BorderSide(color: Colors.grey.shade200),
+            side: BorderSide(color: Theme.of(context).dividerColor),
             borderRadius: BorderRadius.circular(12),
           ),
           margin: const EdgeInsets.only(bottom: 12),
