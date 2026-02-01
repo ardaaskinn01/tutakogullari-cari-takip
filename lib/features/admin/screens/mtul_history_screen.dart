@@ -7,6 +7,7 @@ import '../../../core/utils/helpers.dart';
 import '../../../core/widgets/data_table_wrapper.dart';
 import '../../../models/mtul_calculation.dart';
 import '../../dashboard/repositories/mtul_repository.dart';
+import '../../../core/utils/pdf_generator.dart';
 
 final mtulSummaryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repository = ref.watch(mtulRepositoryProvider);
@@ -33,6 +34,8 @@ class MtulHistoryScreen extends ConsumerStatefulWidget {
 
 class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
   String? _selectedCustomer;
+  final Set<String> _selectedItems = {};
+  bool _isSelectionMode = false;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +56,11 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
               if (_selectedCustomer != null) {
-                setState(() => _selectedCustomer = null);
+                setState(() {
+                  _selectedCustomer = null;
+                  _isSelectionMode = false;
+                  _selectedItems.clear();
+                });
               } else if (context.canPop()) {
                 context.pop();
               } else {
@@ -61,11 +68,50 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
               }
             },
           ),
+          actions: [
+            if (_selectedCustomer != null)
+              IconButton(
+                icon: Icon(_isSelectionMode ? Icons.close : Icons.picture_as_pdf),
+                tooltip: _isSelectionMode ? 'İptal' : 'PDF Oluştur',
+                onPressed: () {
+                  setState(() {
+                    _isSelectionMode = !_isSelectionMode;
+                    _selectedItems.clear();
+                  });
+                },
+              ),
+            const SizedBox(width: 8),
+          ],
         ),
-        body: _selectedCustomer == null 
-            ? _buildCustomerSummary(isDesktop) 
-            : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
-      ),
+      body: _selectedCustomer == null 
+          ? _buildCustomerSummary(isDesktop) 
+          : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
+      floatingActionButton: _isSelectionMode && _selectedItems.isNotEmpty
+          ? Padding(
+              padding: const EdgeInsets.only(left: 32.0), // Sol hizalama için padding
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'print_btn',
+                    onPressed: () => _printSelected(context, ref, isShare: false),
+                    label: Text('Yazdır (${_selectedItems.length})'),
+                    icon: const Icon(Icons.print),
+                  ),
+                  const SizedBox(width: 16),
+                  FloatingActionButton.extended(
+                    heroTag: 'share_btn',
+                    onPressed: () => _printSelected(context, ref, isShare: true),
+                    label: const Text('Paylaş'),
+                    icon: const Icon(Icons.share),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ],
+              ),
+            )
+          : null,
+    ),
     );
   }
 
@@ -166,17 +212,38 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
                     DataColumn(label: Text('Toplam Tutar'), numeric: true),
                     DataColumn(label: Text('')),
                   ],
-                  rows: calculations.map((calc) => DataRow(
-                    cells: [
-                      DataCell(Text(Helpers.formatDateTime(calc.createdAt))),
-                      DataCell(Text(
-                        Helpers.formatCurrency(calc.totalPrice),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-                      )),
-                      DataCell(const Icon(Icons.chevron_right)),
-                    ],
-                    onSelectChanged: (_) => _showDetailDialog(context, ref, calc.id),
-                  )).toList(),
+                    rows: calculations.map((calc) {
+                      final isSelected = _selectedItems.contains(calc.id);
+                      return DataRow(
+                        selected: isSelected,
+                        onSelectChanged: (val) {
+                          if (_isSelectionMode) {
+                            setState(() {
+                              if (val == true) {
+                                _selectedItems.add(calc.id);
+                              } else {
+                                _selectedItems.remove(calc.id);
+                              }
+                            });
+                          } else {
+                            _showDetailDialog(context, ref, calc.id);
+                          }
+                        },
+                        cells: [
+                          DataCell(Text(Helpers.formatDateTime(calc.createdAt))),
+                          DataCell(Text(
+                            Helpers.formatCurrency(calc.totalPrice),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                          )),
+                          DataCell(Icon(
+                            _isSelectionMode 
+                                ? (isSelected ? Icons.check_box : Icons.check_box_outline_blank)
+                                : Icons.chevron_right,
+                            color: _isSelectionMode ? (isSelected ? Colors.blue : Colors.grey) : Colors.grey,
+                          )),
+                        ],
+                      );
+                    }).toList(),
                 ),
               ),
             ),
@@ -196,13 +263,82 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
                   Helpers.formatCurrency(calc.totalPrice),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
                 ),
-                onTap: () => _showDetailDialog(context, ref, calc.id),
+                onTap: () {
+                   if (_isSelectionMode) {
+                     setState(() {
+                       if (_selectedItems.contains(calc.id)) {
+                         _selectedItems.remove(calc.id);
+                       } else {
+                         _selectedItems.add(calc.id);
+                       }
+                     });
+                   } else {
+                     _showDetailDialog(context, ref, calc.id);
+                   }
+                },
+                leading: _isSelectionMode 
+                    ? Checkbox(
+                        value: _selectedItems.contains(calc.id),
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedItems.add(calc.id);
+                            } else {
+                              _selectedItems.remove(calc.id);
+                            }
+                          });
+                        },
+                      )
+                    : null,
               ),
             ).animate().fadeIn(delay: (30 * index).ms).slideX();
           },
         );
       },
     );
+  }
+
+  Future<void> _printSelected(BuildContext context, WidgetRef ref, {required bool isShare}) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final repository = ref.read(mtulRepositoryProvider);
+      
+      // Fetch details for all selected items
+      final List<MtulCalculation> detailedList = [];
+      for (final id in _selectedItems) {
+        final detail = await repository.getCalculationDetail(id);
+        detailedList.add(detail);
+      }
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        
+        if (isShare) {
+          await PdfGenerator.shareMtulPdf(
+            _selectedCustomer ?? 'Müşteri',
+            detailedList,
+          );
+        } else {
+          await PdfGenerator.generateMtulPdf(
+            _selectedCustomer ?? 'Müşteri',
+            detailedList,
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('İşlem Başarısız: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _showDetailDialog(BuildContext context, WidgetRef ref, String id) {
