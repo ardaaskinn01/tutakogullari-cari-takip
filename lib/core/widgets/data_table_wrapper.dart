@@ -50,22 +50,30 @@ class DataTableWrapper extends StatelessWidget {
                 ),
               )
             else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: isDesktop ? MediaQuery.of(context).size.width - 350 : 600,
-                  ),
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                      Theme.of(context).primaryColor.withOpacity(0.05),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                      ),
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(
+                          Theme.of(context).primaryColor.withOpacity(0.05),
+                        ),
+                        showCheckboxColumn: false,
+                        columns: columns,
+                        rows: rows,
+                        columnSpacing: 24,
+                        horizontalMargin: 12,
+                        headingTextStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    columns: columns,
-                    rows: rows,
-                    columnSpacing: 24,
-                    horizontalMargin: 12,
-                  ),
-                ),
+                  );
+                },
               ),
           ],
         ),

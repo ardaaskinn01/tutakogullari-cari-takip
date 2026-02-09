@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../constants/app_constants.dart';
 import '../../features/auth/services/auth_service.dart';
 import '../utils/refresh_utils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SideMenu extends ConsumerWidget {
   final bool isDrawer;
@@ -86,6 +88,16 @@ class SideMenu extends ConsumerWidget {
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Divider(color: Colors.white10),
                     ),
+                    _MenuItem(
+                      icon: Icons.web,
+                      title: 'Web Sitesini Düzenle',
+                      iconColor: Colors.purpleAccent,
+                      onTap: () => _openWebAdminPanel(context),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Divider(color: Colors.white10),
+                    ),
                   ],
                   
                   _MenuItem(
@@ -127,6 +139,34 @@ class SideMenu extends ConsumerWidget {
   void _navigate(BuildContext context, String route) {
     if (isDrawer) Navigator.pop(context);
     context.go(route);
+  }
+
+  Future<void> _openWebAdminPanel(BuildContext context) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Oturum bilgisi alınamadı.')),
+      );
+      return;
+    }
+
+    final accessToken = session.accessToken;
+    final refreshToken = session.refreshToken;
+
+    // Web sitesindeki admin paneline token ile yönlendir
+    final Uri url = Uri.parse(
+      'https://penceredunyasi43.com/yonetim/panel?access_token=$accessToken&refresh_token=$refreshToken',
+    );
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Web sitesi açılamadı.')),
+        );
+      }
+    }
   }
 }
 

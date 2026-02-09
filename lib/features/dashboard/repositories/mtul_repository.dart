@@ -156,6 +156,14 @@ class MtulRepository {
 
     return summary.values.toList();
   }
+
+  // 8. Hesaplamaları Sil
+  Future<void> deleteCalculations(List<String> ids) async {
+    await _supabase
+        .from('mtul_calculations')
+        .delete()
+        .inFilter('id', ids);
+  }
 }
 
 final mtulRepositoryProvider = Provider<MtulRepository>((ref) {

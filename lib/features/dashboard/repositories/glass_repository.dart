@@ -55,6 +55,14 @@ class GlassRepository {
 
     return summary.values.toList();
   }
+
+  // 4. Hesaplamaları Sil
+  Future<void> deleteCalculations(List<String> ids) async {
+    await _supabase
+        .from('glass_calculations')
+        .delete()
+        .inFilter('id', ids);
+  }
 }
 
 final glassRepositoryProvider = Provider<GlassRepository>((ref) {

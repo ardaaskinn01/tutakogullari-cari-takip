@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -6,10 +7,11 @@ import 'package:printing/printing.dart';
 import '../../models/mtul_calculation.dart';
 import '../../models/glass_calculation.dart';
 import 'helpers.dart';
+import 'platform_download.dart'; // Import the new helper
 
 class PdfGenerator {
   // --- Metretül ---
-
+  
   static Future<Uint8List> createMtulPdfBytes(
     String customerName,
     List<MtulCalculation> calculations,
@@ -120,10 +122,15 @@ class PdfGenerator {
     List<MtulCalculation> calculations,
   ) async {
     final bytes = await createMtulPdfBytes(customerName, calculations);
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => bytes,
-      name: '${customerName}_mtul_dokumu.pdf',
-    );
+    
+    if (kIsWeb) {
+      downloadPdfOnWeb('${customerName}_mtul_dokumu.pdf', bytes);
+    } else {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => bytes,
+        name: '${customerName}_mtul_dokumu.pdf',
+      );
+    }
   }
 
   static Future<void> shareMtulPdf(
@@ -131,10 +138,15 @@ class PdfGenerator {
     List<MtulCalculation> calculations,
   ) async {
     final bytes = await createMtulPdfBytes(customerName, calculations);
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: '${customerName}_mtul_dokumu.pdf',
-    );
+    
+    if (kIsWeb) {
+      downloadPdfOnWeb('${customerName}_mtul_dokumu.pdf', bytes);
+    } else {
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: '${customerName}_mtul_dokumu.pdf',
+      );
+    }
   }
 
   // --- Cam m² ---
@@ -221,10 +233,15 @@ class PdfGenerator {
     List<GlassCalculation> calculations,
   ) async {
     final bytes = await createGlassPdfBytes(customerName, calculations);
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => bytes,
-      name: '${customerName}_cam_dokumu.pdf',
-    );
+    
+    if (kIsWeb) {
+      downloadPdfOnWeb('${customerName}_cam_dokumu.pdf', bytes);
+    } else {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => bytes,
+        name: '${customerName}_cam_dokumu.pdf',
+      );
+    }
   }
 
   static Future<void> shareGlassPdf(
@@ -232,10 +249,15 @@ class PdfGenerator {
     List<GlassCalculation> calculations,
   ) async {
     final bytes = await createGlassPdfBytes(customerName, calculations);
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: '${customerName}_cam_dokumu.pdf',
-    );
+    
+    if (kIsWeb) {
+      downloadPdfOnWeb('${customerName}_cam_dokumu.pdf', bytes);
+    } else {
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: '${customerName}_cam_dokumu.pdf',
+      );
+    }
   }
 
   // --- Yardımcılar ---

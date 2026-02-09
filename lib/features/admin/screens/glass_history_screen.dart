@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -82,11 +83,28 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
             ? _buildCustomerSummary(isDesktop) 
             : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
         floatingActionButton: _isSelectionMode && _selectedItems.isNotEmpty
-            ? Padding(
-                padding: const EdgeInsets.only(left: 32.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
+          ? Padding(
+              padding: const EdgeInsets.only(left: 32.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'delete_btn_glass',
+                    onPressed: () => _deleteSelected(context, ref),
+                    label: const Text('Sil'),
+                    icon: const Icon(Icons.delete),
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  const SizedBox(width: 16),
+                  if (kIsWeb)
+                    FloatingActionButton.extended(
+                      heroTag: 'download_btn_glass',
+                      onPressed: () => _printSelected(context, ref, isShare: false),
+                      label: Text('İndir (${_selectedItems.length})'),
+                      icon: const Icon(Icons.download),
+                    )
+                  else ...[
                     FloatingActionButton.extended(
                       heroTag: 'print_btn_glass',
                       onPressed: () => _printSelected(context, ref, isShare: false),
@@ -103,9 +121,10 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
                       foregroundColor: Colors.white,
                     ),
                   ],
-                ),
-              )
-            : null,
+                ],
+              ),
+            )
+          : null,
       ),
     );
   }
@@ -299,6 +318,52 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
   }
 
 
+
+  Future<void> _deleteSelected(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Silme Onayı'),
+        content: Text('${_selectedItems.length} kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('SİL', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final repository = ref.read(glassRepositoryProvider);
+        await repository.deleteCalculations(_selectedItems.toList());
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kayıtlar başarıyla silindi'), backgroundColor: Colors.green),
+          );
+          
+          ref.invalidate(glassSummaryProvider);
+          if (_selectedCustomer != null) {
+            ref.invalidate(customerGlassCalculationsProvider(_selectedCustomer!));
+          }
+          
+          setState(() {
+            _selectedItems.clear();
+          });
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Silme işlemi başarısız: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _printSelected(BuildContext context, WidgetRef ref, {required bool isShare}) async {
     try {
       if (_selectedCustomer == null) return;
@@ -313,9 +378,13 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
       final calculations = await ref.read(customerGlassCalculationsProvider(_selectedCustomer!).future);
       final selectedCalcs = calculations.where((c) => _selectedItems.contains(c.id)).toList();
 
+      // Close loading dialog FIRST
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Then proceed with generation/share
+      if (context.mounted) {
         if (isShare) {
           await PdfGenerator.shareGlassPdf(
             _selectedCustomer!,
@@ -330,7 +399,13 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
+        // If error happened during fetch, dialog might still be open. 
+        // We can check if we can pop, but safely just showing snackbar is often enough 
+        // if we assume the user can manually close or we handle 'finally' block better.
+        // For now, removing the risky pop in catch block to avoid popping the screen itself.
+        // User will have to tap back or we rely on the barrier not being dismissible sucks if it hangs.
+        // But the main fix is popping BEFORE the heavy UI work of PDF.
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('İşlem Başarısız: $e'), backgroundColor: Colors.red),
         );

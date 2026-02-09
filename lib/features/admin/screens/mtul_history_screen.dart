@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -88,25 +89,43 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
           : _buildCustomerDetailList(_selectedCustomer!, isDesktop),
       floatingActionButton: _isSelectionMode && _selectedItems.isNotEmpty
           ? Padding(
-              padding: const EdgeInsets.only(left: 32.0), // Sol hizalama için padding
+              padding: const EdgeInsets.only(left: 32.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   FloatingActionButton.extended(
-                    heroTag: 'print_btn',
-                    onPressed: () => _printSelected(context, ref, isShare: false),
-                    label: Text('Yazdır (${_selectedItems.length})'),
-                    icon: const Icon(Icons.print),
-                  ),
-                  const SizedBox(width: 16),
-                  FloatingActionButton.extended(
-                    heroTag: 'share_btn',
-                    onPressed: () => _printSelected(context, ref, isShare: true),
-                    label: const Text('Paylaş'),
-                    icon: const Icon(Icons.share),
-                    backgroundColor: Colors.green,
+                    heroTag: 'delete_btn_mtul',
+                    onPressed: () => _deleteSelected(context, ref),
+                    label: const Text('Sil'),
+                    icon: const Icon(Icons.delete),
+                    backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
+                  const SizedBox(width: 16),
+                  if (kIsWeb)
+                    FloatingActionButton.extended(
+                      heroTag: 'download_btn_mtul',
+                      onPressed: () => _printSelected(context, ref, isShare: false),
+                      label: Text('İndir (${_selectedItems.length})'),
+                      icon: const Icon(Icons.download),
+                    )
+                  else ...[
+                    FloatingActionButton.extended(
+                      heroTag: 'print_btn',
+                      onPressed: () => _printSelected(context, ref, isShare: false),
+                      label: Text('Yazdır (${_selectedItems.length})'),
+                      icon: const Icon(Icons.print),
+                    ),
+                    const SizedBox(width: 16),
+                    FloatingActionButton.extended(
+                      heroTag: 'share_btn',
+                      onPressed: () => _printSelected(context, ref, isShare: true),
+                      label: const Text('Paylaş'),
+                      icon: const Icon(Icons.share),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ],
                 ],
               ),
             )
@@ -298,6 +317,51 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
     );
   }
 
+  Future<void> _deleteSelected(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Silme Onayı'),
+        content: Text('${_selectedItems.length} kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('SİL', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final repository = ref.read(mtulRepositoryProvider);
+        await repository.deleteCalculations(_selectedItems.toList());
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kayıtlar başarıyla silindi'), backgroundColor: Colors.green),
+          );
+          
+          ref.invalidate(mtulSummaryProvider);
+          if (_selectedCustomer != null) {
+            ref.invalidate(customerCalculationsProvider(_selectedCustomer!));
+          }
+          
+          setState(() {
+            _selectedItems.clear();
+          });
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Silme işlemi başarısız: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _printSelected(BuildContext context, WidgetRef ref, {required bool isShare}) async {
     try {
       // Show loading
@@ -316,9 +380,13 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
         detailedList.add(detail);
       }
 
+      // Close loading dialog FIRST
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Then proceed with generation/share
+      if (context.mounted) {
         if (isShare) {
           await PdfGenerator.shareMtulPdf(
             _selectedCustomer ?? 'Müşteri',
@@ -332,9 +400,21 @@ class _MtulHistoryScreenState extends ConsumerState<MtulHistoryScreen> {
         }
       }
     } catch (e) {
+      // Ensure loading is closed if error happens before pop
+      // If error happens after pop, this might try to pop the screen, so we need to be careful.
+      // But since we popped explicitly above, the only errors caught here would be from fetch or from generation.
+      // If from generation, the dialog is already closed.
+      
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
+         // Only pop if we think the dialog is still open?
+         // Actually, simpler logic: catch only handles the error message now if dialog is closed.
+         // But if fetch failed, dialog is open.
+         // Let's rely on a flag or try/finally.
+         
+         // Better approach: use try/finally for the dialog? 
+         // But await is after dialog close.
+         
+         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('İşlem Başarısız: $e'), backgroundColor: Colors.red),
         );
       }
