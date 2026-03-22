@@ -242,7 +242,7 @@ class _AddAlacakDialogState extends ConsumerState<AddAlacakDialog> {
           type: CariTransactionType.debt,
           amount: amount,
           description: _descController.text.isEmpty ? 'Açılış Bakiyesi' : _descController.text,
-          createdBy: user?.id ?? '',
+          createdBy: user?.uid ?? '',
           createdAt: transactionDate,
         );
         await repository.addTransaction(tx);
@@ -439,7 +439,7 @@ class _AddTahsilatDialogState extends ConsumerState<AddTahsilatDialog> {
         amount: amount,
         paymentMethod: _selectedPaymentMethod, // Nakit/Kart/Çek
         description: 'Tahsilat',
-        createdBy: user?.id ?? '',
+        createdBy: user?.uid ?? '',
         createdAt: transactionDate,
       );
       

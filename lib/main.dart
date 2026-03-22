@@ -6,10 +6,12 @@ import 'package:is_takip/core/theme/app_theme.dart';
 import 'package:is_takip/core/theme/theme_provider.dart';
 import 'package:is_takip/core/router/app_router.dart';
 import 'package:is_takip/core/constants/app_constants.dart';
-import 'package:is_takip/features/auth/services/supabase_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'firebase_seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +19,9 @@ void main() async {
   // Initialize Date Formatting for Turkish
   await initializeDateFormatting('tr_TR', null);
   
-  // Initialize Supabase
-  await initializeSupabase();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   
   // Desktop Window Configuration
   if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux)) {

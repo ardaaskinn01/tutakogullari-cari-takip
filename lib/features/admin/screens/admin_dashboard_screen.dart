@@ -24,7 +24,7 @@ final allTransactionsProvider = FutureProvider<List<model.Transaction>>((ref) as
   final isAdmin = await ref.watch(isAdminProvider.future);
   
   if (user == null) return [];
-  return repository.getTransactions(userId: user!.id, isAdmin: isAdmin);
+  return repository.getTransactions(userId: user!.uid, isAdmin: isAdmin);
 });
 
 class AdminDashboardScreen extends ConsumerWidget {
@@ -60,7 +60,7 @@ class AdminDashboardScreen extends ConsumerWidget {
       child: Scaffold(
         drawer: MediaQuery.of(context).size.width <= 900 
           ? Drawer(child: SideMenu(
-              key: ValueKey(ref.watch(currentUserProvider).value?.id ?? 'admin-drawer'),
+              key: ValueKey(ref.watch(currentUserProvider).value?.uid ?? 'admin-drawer'),
               isDrawer: true
             )) 
           : null,

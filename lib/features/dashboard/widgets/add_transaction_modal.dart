@@ -112,7 +112,7 @@ class _AddTransactionModalState extends ConsumerState<AddTransactionModal> {
         paymentMethod: _selectedPaymentMethod,
         amount: amount,
         description: finalDescription,
-        createdBy: widget.initialTransaction?.createdBy ?? user!.id,
+        createdBy: widget.initialTransaction?.createdBy ?? user!.uid,
         createdAt: transactionDate,
       );
 

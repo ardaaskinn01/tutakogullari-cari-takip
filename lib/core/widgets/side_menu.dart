@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../constants/app_constants.dart';
 import '../../features/auth/services/auth_service.dart';
 import '../utils/refresh_utils.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SideMenu extends ConsumerWidget {
@@ -98,6 +98,60 @@ class SideMenu extends ConsumerWidget {
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Divider(color: Colors.white10),
                     ),
+                    _MenuItem(
+                      icon: Icons.password,
+                      title: 'Şifrenizi Değiştirin',
+                      iconColor: Colors.amber,
+                      onTap: () {
+                        if (isDrawer) Navigator.pop(context);
+                        final passwordController = TextEditingController();
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Şifre Değiştir'),
+                            content: TextField(
+                              controller: passwordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Yeni Şifre',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('İptal'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final p = passwordController.text.trim();
+                                  if (p.length < 6) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifre en az 6 karakter olmalı.')));
+                                    return;
+                                  }
+                                  try {
+                                    await ref.read(authServiceProvider).updatePassword(p);
+                                    if (ctx.mounted) {
+                                      Navigator.pop(ctx);
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifreniz başarıyla güncellendi.', style: TextStyle(color: Colors.green))));
+                                    }
+                                  } catch(e) {
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e', style: const TextStyle(color: Colors.red))));
+                                    }
+                                  }
+                                },
+                                child: const Text('Güncelle'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Divider(color: Colors.white10),
+                    ),
                   ],
                   
                   _MenuItem(
@@ -142,16 +196,16 @@ class SideMenu extends ConsumerWidget {
   }
 
   Future<void> _openWebAdminPanel(BuildContext context) async {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Oturum bilgisi alınamadı.')),
       );
       return;
     }
 
-    final accessToken = session.accessToken;
-    final refreshToken = session.refreshToken;
+    final accessToken = await user.getIdToken();
+    final refreshToken = ''; // Refresh token is not directly exposed in the same way in Firebase.
 
     // Web sitesindeki admin paneline token ile yönlendir
     final Uri url = Uri.parse(

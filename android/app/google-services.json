@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "807569626663",
+    "project_id": "is-takip-aff20",
+    "storage_bucket": "is-takip-aff20.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807569626663:android:803c0ed230d0917a6ca002",
+        "android_client_info": {
+          "package_name": "com.aasoft.is_takip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHFTJodLVG4G407c-_Av2wJkxEwVIlCM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

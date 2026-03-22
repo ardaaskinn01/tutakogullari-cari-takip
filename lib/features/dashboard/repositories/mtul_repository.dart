@@ -1,134 +1,170 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/mtul_price.dart';
 import '../../../models/mtul_calculation.dart';
-import '../../auth/services/supabase_service.dart';
+import '../../../core/services/firebase_providers.dart';
 
 class MtulRepository {
-  final SupabaseClient _supabase;
+  final FirebaseFirestore _firestore;
 
-  MtulRepository(this._supabase);
+  MtulRepository(this._firestore);
 
-  // --- Fiyat Yönetimi ---
-
-  // 1. Kategoriye göre fiyatları getir
   Future<List<MtulPrice>> getPrices(String category) async {
-    final List<dynamic> data = await _supabase
-        .from('mtul_prices')
-        .select()
-        .eq('category', category)
-        .order('sort_order', ascending: true);
-    
-    return data.map((e) => MtulPrice.fromJson(e)).toList();
+    final snapshot = await _firestore
+        .collection('mtul_prices')
+        .where('category', isEqualTo: category)
+        .get();
+
+    final prices = snapshot.docs.map((doc) {
+      final json = doc.data();
+      json['id'] = doc.id;
+      if (json['created_at'] is Timestamp) {
+         json['created_at'] = (json['created_at'] as Timestamp).toDate().toIso8601String();
+      } else if (json['created_at'] == null) {
+         json['created_at'] = DateTime.now().toIso8601String();
+      }
+      return MtulPrice.fromJson(json);
+    }).toList();
+
+    // Local sort to avoid composite index
+    prices.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return prices;
   }
 
-  // 2. Fiyat Güncelle
   Future<void> updatePrice(String id, double newPrice) async {
-    await _supabase
-        .from('mtul_prices')
-        .update({'unit_price': newPrice})
-        .eq('id', id);
+    await _firestore
+        .collection('mtul_prices')
+        .doc(id)
+        .update({'unit_price': newPrice});
   }
 
-  // 3. Varsayılan Fiyatları Oluştur ve Düzenle
   Future<void> seedDefaultPrices(String category, List<String> components) async {
-    final List<dynamic> currentData = await _supabase
-        .from('mtul_prices')
-        .select()
-        .eq('category', category);
+    final snapshot = await _firestore
+        .collection('mtul_prices')
+        .where('category', isEqualTo: category)
+        .get();
     
-    final existingPrices = currentData.map((e) => MtulPrice.fromJson(e)).toList();
+    final existingPrices = snapshot.docs.map((doc) {
+       final json = doc.data();
+       json['id'] = doc.id;
+       if (json['created_at'] is Timestamp) {
+         json['created_at'] = (json['created_at'] as Timestamp).toDate().toIso8601String();
+       } else if (json['created_at'] == null) {
+         json['created_at'] = DateTime.now().toIso8601String();
+       }
+       return MtulPrice.fromJson(json);
+    }).toList();
     
-    // İşlem kolaylığı için mevcutları isim bazlı (küçük harf) haritaya alalım
     final Map<String, MtulPrice> existingMap = {
       for (var p in existingPrices) p.componentName.toLowerCase(): p
     };
 
-    // 1. İstenmeyen (listede olmayan) küçük harf hatalı veya eski kayıtları temizle
-    // Not: Sadece 'standard' kategorisi için bu temizliği yapmak daha güvenli olabilir
-    // Ancak kullanıcı "çift kere sıralanmış" dediği için tutarsızlığı gidermeliyiz.
     final List<String> lowercaseDefaults = components.map((e) => e.toLowerCase()).toList();
     for (var existing in existingPrices) {
       if (!lowercaseDefaults.contains(existing.componentName.toLowerCase())) {
-        await _supabase.from('mtul_prices').delete().eq('id', existing.id);
+        await _firestore.collection('mtul_prices').doc(existing.id).delete();
       }
     }
 
-    // 2. Listeyi Güncelle veya Ekle
     for (int i = 0; i < components.length; i++) {
       final targetName = components[i];
       final lowerName = targetName.toLowerCase();
       
       if (existingMap.containsKey(lowerName)) {
         final existing = existingMap[lowerName]!;
-        // Varsa ismini (casing) ve sırasını güncelle
-        await _supabase.from('mtul_prices').update({
+        await _firestore.collection('mtul_prices').doc(existing.id).update({
           'component_name': targetName,
           'sort_order': i,
-        }).eq('id', existing.id);
+        });
       } else {
-        // Yoksa ekle
-        await _supabase.from('mtul_prices').insert({
+        await _firestore.collection('mtul_prices').add({
           'category': category,
           'component_name': targetName,
-          'unit_price': 0,
+          'unit_price': 0.0,
           'sort_order': i,
+          'created_at': FieldValue.serverTimestamp(),
         });
       }
     }
   }
 
 
-  // --- Hesaplama Geçmişi ---
-
-  // 4. Hesaplamayı Kaydet
   Future<void> saveCalculation({
     required String customerName,
     required double totalPrice,
-    required List<Map<String, dynamic>> items, // {component_name, quantity, unit_price, total_price}
+    required List<Map<String, dynamic>> items,
   }) async {
-    
-    // A. Ana kaydı oluştur
-    final calcData = await _supabase.from('mtul_calculations').insert({
+    final docRef = await _firestore.collection('mtul_calculations').add({
       'customer_name': customerName,
       'total_price': totalPrice,
-    }).select().single();
+      'created_at': FieldValue.serverTimestamp(),
+    });
 
-    final calculationId = calcData['id'] as String;
+    final calculationId = docRef.id;
 
-    // B. Detayları ekle
-    final itemsToInsert = items.map((item) => {
-      'calculation_id': calculationId,
-      ...item,
+    WriteBatch batch = _firestore.batch();
+    for(var item in items) {
+       final itemRef = _firestore.collection('mtul_calculation_items').doc();
+       final itemData = {
+         'calculation_id': calculationId,
+         ...item,
+       };
+       batch.set(itemRef, itemData);
+    }
+    await batch.commit();
+  }
+
+  Future<List<MtulCalculation>> getCalculations() async {
+    final snapshot = await _firestore
+        .collection('mtul_calculations')
+        .get();
+
+    final calculations = snapshot.docs.map((doc) {
+       final json = doc.data();
+       json['id'] = doc.id;
+       if (json['created_at'] is Timestamp) {
+         json['created_at'] = (json['created_at'] as Timestamp).toDate().toIso8601String();
+       } else if (json['created_at'] == null) {
+         json['created_at'] = DateTime.now().toIso8601String();
+       }
+       return MtulCalculation.fromJson(json);
     }).toList();
 
-    await _supabase.from('mtul_calculation_items').insert(itemsToInsert);
+    // Local sort
+    calculations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return calculations;
   }
 
-  // 5. Geçmiş Hesaplamaları Getir
-  Future<List<MtulCalculation>> getCalculations() async {
-    // Join ile items'ı da çekebiliriz ama liste ekranı için sadece başlıklar yeterli
-    // Detay gerekirse ayrı çekeriz. Şimdilik sadece ana tabloyu çekelim.
-    final List<dynamic> data = await _supabase
-        .from('mtul_calculations')
-        .select()
-        .order('created_at', ascending: false);
-
-    return data.map((e) => MtulCalculation.fromJson(e)).toList();
-  }
-
-  // 6. Tek Bir Hesaplamanın Detaylarını Getir
   Future<MtulCalculation> getCalculationDetail(String id) async {
-    final response = await _supabase
-        .from('mtul_calculations')
-        .select('*, mtul_calculation_items(*)')
-        .eq('id', id)
-        .single();
-    
-    return MtulCalculation.fromJson(response);
+    final calcDoc = await _firestore.collection('mtul_calculations').doc(id).get();
+    if (!calcDoc.exists) {
+      throw Exception('Hesaplama bulunamadı');
+    }
+
+    final calcData = calcDoc.data()!;
+    calcData['id'] = calcDoc.id;
+    if (calcData['created_at'] is Timestamp) {
+       calcData['created_at'] = (calcData['created_at'] as Timestamp).toDate().toIso8601String();
+    } else if (calcData['created_at'] == null) {
+       calcData['created_at'] = DateTime.now().toIso8601String();
+    }
+
+    final itemsSnapshot = await _firestore
+       .collection('mtul_calculation_items')
+       .where('calculation_id', isEqualTo: id)
+       .get();
+
+    final itemsList = itemsSnapshot.docs.map((doc) {
+       final d = doc.data();
+       d['id'] = doc.id;
+       return d;
+    }).toList();
+
+    calcData['mtul_calculation_items'] = itemsList;
+
+    return MtulCalculation.fromJson(calcData);
   }
 
-  // 7. Müşteri Bazlı Özet Raporu (Client-side Grouping)
   Future<List<Map<String, dynamic>>> getCustomerSummary() async {
     final calculations = await getCalculations();
     
@@ -147,7 +183,6 @@ class MtulRepository {
       summary[calc.customerName]!['total_count'] += 1;
       summary[calc.customerName]!['total_amount'] += calc.totalPrice;
       
-      // En son sipariş tarihini güncelle
       final lastDate = summary[calc.customerName]!['last_order_date'] as DateTime;
       if (calc.createdAt.isAfter(lastDate)) {
         summary[calc.customerName]!['last_order_date'] = calc.createdAt;
@@ -157,16 +192,20 @@ class MtulRepository {
     return summary.values.toList();
   }
 
-  // 8. Hesaplamaları Sil
   Future<void> deleteCalculations(List<String> ids) async {
-    await _supabase
-        .from('mtul_calculations')
-        .delete()
-        .inFilter('id', ids);
+    WriteBatch batch = _firestore.batch();
+    for (var id in ids) {
+       batch.delete(_firestore.collection('mtul_calculations').doc(id));
+       final itemsSnap = await _firestore.collection('mtul_calculation_items').where('calculation_id', isEqualTo: id).get();
+       for(var doc in itemsSnap.docs) {
+          batch.delete(doc.reference);
+       }
+    }
+    await batch.commit();
   }
 }
 
 final mtulRepositoryProvider = Provider<MtulRepository>((ref) {
-  final supabase = ref.watch(supabaseClientProvider);
-  return MtulRepository(supabase);
+  final firestore = ref.watch(firestoreProvider);
+  return MtulRepository(firestore);
 });

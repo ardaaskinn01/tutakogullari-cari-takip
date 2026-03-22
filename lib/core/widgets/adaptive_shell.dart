@@ -18,7 +18,7 @@ class AdaptiveShell extends ConsumerWidget {
         body: Row(
           children: [
             SideMenu(
-              key: ValueKey(user?.id ?? 'no-user'), 
+              key: ValueKey(user?.uid ?? 'no-user'), 
               isDrawer: false
             ),
             const VerticalDivider(width: 1, color: Colors.white10),

@@ -17,13 +17,13 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      id: json['id'] as String,
-      email: json['email'] as String,
+      id: json['id'] as String? ?? '',
+      email: json['email'] as String? ?? 'bilinmiyor@example.com',
       fullName: json['full_name'] as String?,
       password: json['password'] as String?,
       role: json['role'] as String? ?? 'user',
       createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.tryParse(json['created_at'] as String)
           : null,
     );
   }

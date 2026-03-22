@@ -19,7 +19,7 @@ final userTransactionsProvider = FutureProvider<List<Transaction>>((ref) async {
   if (user == null) return [];
   
   // isAdmin = false göndererek sadece kendi işlemlerini çekmesini sağlıyoruz
-  return repository.getTransactions(userId: user!.id, isAdmin: false);
+  return repository.getTransactions(userId: user!.uid, isAdmin: false);
 });
 
 class UserDashboardScreen extends ConsumerWidget {
@@ -54,7 +54,7 @@ class UserDashboardScreen extends ConsumerWidget {
       child: Scaffold(
         drawer: MediaQuery.of(context).size.width <= 900 
           ? Drawer(child: SideMenu(
-              key: ValueKey(ref.watch(currentUserProvider).value?.id ?? 'user-drawer'),
+              key: ValueKey(ref.watch(currentUserProvider).value?.uid ?? 'user-drawer'),
               isDrawer: true
             )) 
           : null,

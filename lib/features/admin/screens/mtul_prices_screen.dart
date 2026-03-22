@@ -33,7 +33,17 @@ final mtulPricesProvider = FutureProvider.family<List<MtulPrice>, String>((ref, 
       "U Kasa",
       "Mermer Afyon"
     ];
-  } else if (category == 'gold_oak' || category == 'anthracite') {
+  } else if (category == 'gold_oak') {
+    defaults = [
+      "70 Kasa",
+      "Pencere Kanat",
+      "Kapı Kanat",
+      "70 Orta Kayıt",
+      "60 Orta Kayıt",
+      "Çift Cam Çıtası",
+      "Tek Cam Çıtası"
+    ];
+  } else if (category == 'anthracite') {
     defaults = [
       "70 Kasa",
       "Pencere Kanat",

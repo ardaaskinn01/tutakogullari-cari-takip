@@ -1,36 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/auth/services/supabase_service.dart';
+import 'firebase_providers.dart';
 
 final allCustomerNamesProvider = FutureProvider<List<String>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
+  final firestore = ref.watch(firestoreProvider);
   
-  // 1. Fetch from mtul_calculations
-  final mtulData = await supabase
-      .from('mtul_calculations')
-      .select('customer_name');
-  
-  // 2. Fetch from glass_calculations
-  final glassData = await supabase
-      .from('glass_calculations')
-      .select('customer_name');
-      
-  // 3. Fetch from cari_accounts
-  final cariData = await supabase
-      .from('cari_accounts')
-      .select('full_name');
+  final mtulSnap = await firestore.collection('mtul_calculations').get();
+  final glassSnap = await firestore.collection('glass_calculations').get();
+  final cariSnap = await firestore.collection('cari_accounts').get();
 
   final Set<String> names = {};
   
-  for (var row in mtulData) {
-    names.add(row['customer_name'] as String);
+  for (var doc in mtulSnap.docs) {
+    final data = doc.data();
+    if (data.containsKey('customer_name') && data['customer_name'] != null) {
+      names.add(data['customer_name'] as String);
+    }
   }
   
-  for (var row in glassData) {
-    names.add(row['customer_name'] as String);
+  for (var doc in glassSnap.docs) {
+    final data = doc.data();
+    if (data.containsKey('customer_name') && data['customer_name'] != null) {
+      names.add(data['customer_name'] as String);
+    }
   }
   
-  for (var row in cariData) {
-    names.add(row['full_name'] as String);
+  for (var doc in cariSnap.docs) {
+    final data = doc.data();
+    if (data.containsKey('full_name') && data['full_name'] != null) {
+      names.add(data['full_name'] as String);
+    }
   }
   
   return names.toList()..sort();

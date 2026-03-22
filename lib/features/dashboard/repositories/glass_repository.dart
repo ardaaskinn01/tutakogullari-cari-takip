@@ -1,33 +1,39 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/glass_calculation.dart';
-import '../../auth/services/supabase_service.dart';
+import '../../../core/services/firebase_providers.dart';
 
 class GlassRepository {
-  final SupabaseClient _supabase;
+  final FirebaseFirestore _firestore;
 
-  GlassRepository(this._supabase);
+  GlassRepository(this._firestore);
 
-  // 1. Hesaplama Kaydet
   Future<void> saveCalculation(GlassCalculation calculation) async {
     final data = calculation.toJson();
-    data.remove('id'); // ID otomatik oluşacak
+    data.remove('id');
+    data['created_at'] = FieldValue.serverTimestamp();
     
-    await _supabase.from('glass_calculations').insert(data);
+    await _firestore.collection('glass_calculations').add(data);
   }
 
-  // 2. Tüm Hesaplamaları Getir (Tarihe göre sıralı)
   Future<List<GlassCalculation>> getCalculations() async {
-    final List<dynamic> data = await _supabase
-        .from('glass_calculations')
-        .select()
-        .order('created_at', ascending: false);
+    final snapshot = await _firestore
+        .collection('glass_calculations')
+        .orderBy('created_at', descending: true)
+        .get();
 
-    return data.map((json) => GlassCalculation.fromJson(json)).toList();
+    return snapshot.docs.map((doc) {
+      final json = doc.data();
+      json['id'] = doc.id;
+      if (json['created_at'] is Timestamp) {
+         json['created_at'] = (json['created_at'] as Timestamp).toDate().toIso8601String();
+      } else if (json['created_at'] == null) {
+         json['created_at'] = DateTime.now().toIso8601String();
+      }
+      return GlassCalculation.fromJson(json);
+    }).toList();
   }
 
-  // 3. Müşteri Bazlı Özet Raporu (Client-side Grouping)
-  // SQL'de GROUP BY yapmak yerine esneklik için tüm veriyi çekip burada grupluyoruz.
   Future<List<Map<String, dynamic>>> getCustomerSummary() async {
     final calculations = await getCalculations();
     
@@ -46,7 +52,6 @@ class GlassRepository {
       summary[calc.customerName]!['total_count'] += 1;
       summary[calc.customerName]!['total_amount'] += calc.totalPrice;
       
-      // En son sipariş tarihini güncelle
       final lastDate = summary[calc.customerName]!['last_order_date'] as DateTime;
       if (calc.createdAt.isAfter(lastDate)) {
         summary[calc.customerName]!['last_order_date'] = calc.createdAt;
@@ -56,16 +61,16 @@ class GlassRepository {
     return summary.values.toList();
   }
 
-  // 4. Hesaplamaları Sil
   Future<void> deleteCalculations(List<String> ids) async {
-    await _supabase
-        .from('glass_calculations')
-        .delete()
-        .inFilter('id', ids);
+    WriteBatch batch = _firestore.batch();
+    for(var id in ids) {
+       batch.delete(_firestore.collection('glass_calculations').doc(id));
+    }
+    await batch.commit();
   }
 }
 
 final glassRepositoryProvider = Provider<GlassRepository>((ref) {
-  final supabase = ref.watch(supabaseClientProvider);
-  return GlassRepository(supabase);
+  final firestore = ref.watch(firestoreProvider);
+  return GlassRepository(firestore);
 });

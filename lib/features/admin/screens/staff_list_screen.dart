@@ -10,7 +10,7 @@ import '../widgets/add_staff_dialog.dart';
 
 final allProfilesProvider = FutureProvider<List<UserProfile>>((ref) async {
   final authService = ref.watch(authServiceProvider);
-  final currentUserId = ref.watch(currentUserProvider).value?.id;
+  final currentUserId = ref.watch(currentUserProvider).value?.uid;
   final allProfiles = await authService.getAllProfiles();
   return allProfiles.where((p) => p.id != currentUserId).toList();
 });
