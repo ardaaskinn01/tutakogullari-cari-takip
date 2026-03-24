@@ -153,9 +153,59 @@ class AuthService {
 
   // Change Password
   Future<void> updatePassword(String newPassword) async {
-    if (currentUser != null) {
-      // 1. Update password in Authentication
-      await currentUser!.updatePassword(newPassword);
+    final user = currentUser;
+    if (user != null) {
+      try {
+        debugPrint('AuthService: Starting password update for user: ${user.uid}');
+        
+        try {
+          // 1. Update password in Authentication
+          await user.updatePassword(newPassword);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'requires-recent-login') {
+            debugPrint('AuthService: requires-recent-login triggered. Attempting auto-reauth...');
+            // Veritabanından eski şifresini bulup sessizce oturumu yenilemeye çalışıyoruz
+            final doc = await _firestore.collection('profiles').doc(user.uid).get();
+            final oldPassword = doc.data()?['password'] as String?;
+            
+            if (oldPassword != null && oldPassword.isNotEmpty && user.email != null) {
+               final credential = EmailAuthProvider.credential(
+                 email: user.email!, 
+                 password: oldPassword
+               );
+               await user.reauthenticateWithCredential(credential);
+               // Tekrar güncellemeyi dene
+               await user.updatePassword(newPassword);
+               debugPrint('AuthService: Auto-reauth and password update succeeded.');
+            } else {
+               throw Exception('Lütfen güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra şifrenizi değiştirin.');
+            }
+          } else {
+            rethrow;
+          }
+        }
+
+        debugPrint('AuthService: Password updated in Firebase Auth.');
+        
+        // 2. Update password in Firestore profiles table
+        await _firestore.collection('profiles').doc(user.uid).update({
+          'password': newPassword,
+        });
+        debugPrint('AuthService: Password updated in Firestore profiles.');
+      } on FirebaseAuthException catch (e) {
+        debugPrint('AuthService Error Firebase: ${e.code} - ${e.message}');
+        if (e.code == 'requires-recent-login') {
+           throw Exception('Otomatik yeniden giriş başarısız oldu. Lütfen çıkış işlemi yapıp tekrar girin.');
+        } else {
+           throw Exception('Firebase Hatası: ${e.message}');
+        }
+      } catch (e) {
+        debugPrint('AuthService Error General: $e');
+        throw Exception('Bilinmeyen bir hata oluştu: $e');
+      }
+    } else {
+      debugPrint('AuthService: currentUser == null');
+      throw Exception('Oturum açık bir kullanıcı bulunamadı.');
     }
   }
 }

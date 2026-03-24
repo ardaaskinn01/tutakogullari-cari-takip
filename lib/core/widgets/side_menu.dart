@@ -130,14 +130,22 @@ class SideMenu extends ConsumerWidget {
                                     return;
                                   }
                                   try {
+                                    debugPrint('SideMenu: Şifre güncellemesi tetiklendi. Şifre uzunluğu: ${p.length}');
                                     await ref.read(authServiceProvider).updatePassword(p);
+                                    debugPrint('SideMenu: Şifre güncelleme başarılı!');
+                                    
                                     if (ctx.mounted) {
                                       Navigator.pop(ctx);
+                                    }
+                                    if (context.mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifreniz başarıyla güncellendi.', style: TextStyle(color: Colors.green))));
                                     }
                                   } catch(e) {
+                                    debugPrint('SideMenu: Şifre değiştirme hatası yakalandı -> $e');
+                                    final errorMessage = e.toString().replaceFirst('Exception: ', '');
+                                    // Dialog kapatılmasın, sadece hata mesajı gösterilsin, fakat ctx üzerinden yapalım ki görünsün
                                     if (ctx.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e', style: const TextStyle(color: Colors.red))));
+                                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(errorMessage, style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
                                     }
                                   }
                                 },
