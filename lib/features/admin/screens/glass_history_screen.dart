@@ -154,6 +154,7 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
                     DataColumn(label: Text('Müşteri Adı')),
                     DataColumn(label: Text('Toplam Sipariş'), numeric: true),
                     DataColumn(label: Text('Son Sipariş')),
+                    DataColumn(label: Text('Toplam m²'), numeric: true),
                     DataColumn(label: Text('Toplam Ciro'), numeric: true),
                   ],
                   rows: summaryList.map((item) => DataRow(
@@ -161,6 +162,7 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
                       DataCell(Text(item['customer_name'], style: const TextStyle(fontWeight: FontWeight.bold))),
                       DataCell(Text(item['total_count'].toString())),
                       DataCell(Text(Helpers.formatDate(item['last_order_date']))),
+                      DataCell(Text('${item['total_m2'].toStringAsFixed(2)} m²', style: const TextStyle(fontWeight: FontWeight.w500))),
                       DataCell(Text(
                         Helpers.formatCurrency(item['total_amount']),
                         style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
@@ -192,7 +194,7 @@ class _GlassHistoryScreenState extends ConsumerState<GlassHistoryScreen> {
                   ),
                 ),
                 title: Text(item['customer_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                subtitle: Text('${item['total_count']} Sipariş • Son: ${Helpers.formatDate(item['last_order_date'])}'),
+                subtitle: Text('${item['total_count']} Sipariş • ${item['total_m2'].toStringAsFixed(2)} m² • Son: ${Helpers.formatDate(item['last_order_date'])}'),
                 trailing: Text(
                   Helpers.formatCurrency(item['total_amount']),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),

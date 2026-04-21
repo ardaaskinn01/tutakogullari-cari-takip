@@ -45,12 +45,14 @@ class GlassRepository {
           'customer_name': calc.customerName,
           'total_count': 0,
           'total_amount': 0.0,
+          'total_m2': 0.0,
           'last_order_date': calc.createdAt,
         };
       }
       
       summary[calc.customerName]!['total_count'] += 1;
       summary[calc.customerName]!['total_amount'] += calc.totalPrice;
+      summary[calc.customerName]!['total_m2'] += calc.totalM2;
       
       final lastDate = summary[calc.customerName]!['last_order_date'] as DateTime;
       if (calc.createdAt.isAfter(lastDate)) {
